@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { store, AppDispatch } from './src/redux/store';
