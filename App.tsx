@@ -1,45 +1,27 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect } from 'react';
+import { Provider, useDispatch } from 'react-redux';
+import { store, AppDispatch } from './src/redux/store';
+import { initDB } from './src/database/db';
+import { fetchPlates } from './src/redux/plates/platesSlice';
+import TabNavigation from './src/navigation/TabNavigation';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+const AppLoader = () => {
+  const dispatch = useDispatch<AppDispatch>();
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  useEffect(() => {
+    const start = async () => {
+      await initDB();
+      dispatch(fetchPlates());
+    };
+    start();
+  }, [dispatch]);
+  return <TabNavigation />;
+};
 
+export default function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
+    <Provider store={store} >
+      <AppLoader />
+    </Provider>
+  )
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
