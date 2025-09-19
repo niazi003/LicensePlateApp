@@ -129,6 +129,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
     padding: 12, marginBottom: 12, fontSize: 16,
   },
-  button: { backgroundColor: '#28a745', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 20 },
+  button: { backgroundColor: '#28a745', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 28 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });

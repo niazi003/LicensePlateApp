@@ -143,7 +143,7 @@ export default function ImportPlatesCSV() {
 const styles = StyleSheet.create({
   container: { marginVertical: 12, width: '100%', alignItems: 'center' },
   button: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#07c31aff',
     padding: 12,
     borderRadius: 8,
     width: '70%',
