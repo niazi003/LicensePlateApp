@@ -5,6 +5,7 @@ import { store, AppDispatch } from './src/redux/store';
 import { initDB } from './src/database/db';
 import { fetchPlates } from './src/redux/plates/platesSlice';
 import TabNavigation from './src/navigation/TabNavigation';
+import { NavigationContainer } from '@react-navigation/native';
 
 const AppLoader = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -21,8 +22,11 @@ const AppLoader = () => {
 
 export default function App() {
   return (
-    <Provider store={store} >
-      <AppLoader />
-    </Provider>
+    <NavigationContainer>
+      <Provider store={store} >
+        <AppLoader />
+      </Provider>
+    </NavigationContainer>
+
   )
 }

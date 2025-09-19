@@ -21,6 +21,7 @@ export const deletePlateThunk = createAsyncThunk('plates/delete', async (plate_i
 });
 
 type PlateState = {
+    status: any;
     byId: Record<number, Plate>;
     allIds: number[];
     loading: boolean;
@@ -32,6 +33,7 @@ const initialState: PlateState = {
     allIds: [],
     loading: false,
     error: null,
+    status: undefined
 };
 
 const platesSlice = createSlice({

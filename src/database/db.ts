@@ -34,7 +34,7 @@ export const initDB = async (): Promise<void> => {
       external_id TEXT,
       state TEXT,
       country TEXT,
-      name TEXT,
+      name TEXT UNIQUE,
       years_available TEXT,
       available INTEGER DEFAULT 1,
       base INTEGER DEFAULT 0,
