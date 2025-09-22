@@ -46,7 +46,7 @@ const HomePage = () => {
             <Text style={styles.title}>Search Plates</Text>
             <TextInput
                 style={styles.search}
-                placeholder="Search by plate number, state, notes, or external ID"
+                placeholder="Search by plate num., state, notes, or external ID"
                 value={query}
                 onChangeText={onSearch}
                 autoCapitalize='none'
