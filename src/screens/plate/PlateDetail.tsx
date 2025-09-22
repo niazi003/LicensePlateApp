@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ const PlateDetail = ({ route }: Props) => {
   const { plateId } = route.params;
   const navigation = useNavigation<NavProp>();
   const dispatch = useDispatch<AppDispatch>();
+  const [showDelete, setShowDelete] = useState(false);
 
   const plate = useSelector((state: RootState) => state.plates.byId[plateId]);
   const patterns = useSelector((state: RootState) =>
@@ -46,9 +47,10 @@ const PlateDetail = ({ route }: Props) => {
   if (!plate) return <Text style={styles.loading}>Loading...</Text>;
 
   const handleDelete = async () => {
+    const sightingsCount = sightings.length;
     Alert.alert(
       'Delete Plate',
-      'Are you sure you want to delete this plate and all its patterns & sightings?',
+      `This will permanently delete the plate and ${sightingsCount} linked sighting${sightingsCount===1?'':'s'}. This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -81,7 +83,6 @@ const PlateDetail = ({ route }: Props) => {
       {/* Details */}
       <View style={styles.card}>
         <Text style={styles.section}>Details</Text>
-        <Text style={styles.detail}>External ID: {plate.external_id || '-'}</Text>
         <Text style={styles.detail}>Years: {plate.years_available || '-'}</Text>
         <Text style={styles.detail}>Available: {plate.available ? 'Yes' : 'No'}</Text>
         <Text style={styles.detail}>Base: {plate.base ? 'Yes' : 'No'}</Text>
@@ -102,9 +103,15 @@ const PlateDetail = ({ route }: Props) => {
         >
           <Text style={styles.buttonText}>Update</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleDelete}>
-          <Text style={styles.buttonText}>Delete</Text>
-        </TouchableOpacity>
+        {!showDelete ? (
+          <TouchableOpacity style={[styles.button, { borderWidth: 1, borderColor: '#dc3545' }]} onPress={() => setShowDelete(true)}>
+            <Text style={[styles.buttonText, { color: '#dc3545' }]}>Reveal Delete</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleDelete}>
+            <Text style={styles.buttonText}>Delete</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Patterns */}
@@ -116,7 +123,7 @@ const PlateDetail = ({ route }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => navigation.navigate('PatternDetail', { patternId: item.pattern_id! })}
+              onPress={() => (navigation as any).navigate('PatternDetail', { patternId: item.pattern_id! })}
             >
               <Text style={styles.itemTitle}>{item.num_pattern}</Text>
               <Text style={styles.itemSub}>{item.type || '-'}</Text>
@@ -126,7 +133,7 @@ const PlateDetail = ({ route }: Props) => {
         />
         <TouchableOpacity
           style={[styles.button, styles.success]}
-          onPress={() => navigation.navigate('AddPattern', { plateId })}
+          onPress={() => (navigation as any).navigate('AddPattern', { plateId })}
         >
           <Text style={styles.buttonText}>Add Pattern</Text>
         </TouchableOpacity>
@@ -141,7 +148,7 @@ const PlateDetail = ({ route }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => navigation.navigate('SightingDetail', { sightingId: item.sighting_id! })}
+              onPress={() => (navigation as any).navigate('SightingDetail', { sightingId: item.sighting_id! })}
             >
               <Text style={styles.itemTitle}>{item.location || 'Unknown location'}</Text>
               <Text style={styles.itemSub}>{item.time || '-'}</Text>
@@ -151,11 +158,17 @@ const PlateDetail = ({ route }: Props) => {
         />
         <TouchableOpacity
           style={[styles.button, styles.success]}
-          onPress={() => navigation.navigate('AddSighting', { plateId })}
+          onPress={() => (navigation as any).navigate('AddSighting', { plateId })}
         >
           <Text style={styles.buttonText}>Add Sighting</Text>
         </TouchableOpacity>
       </View>
+      {/* Footer External ID */}
+      <View style={[styles.card, { marginBottom: 24 }]}> 
+        <Text style={styles.section}>Identifiers</Text>
+        <Text style={[styles.detail, { fontWeight: '600' }]}>External ID: {plate.external_id || '-'}</Text>
+      </View>
+
     </ScrollView>
   );
 };

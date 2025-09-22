@@ -5,6 +5,10 @@ import AddPlate from '../screens/plate/AddPlate';
 import PlateDetail from '../screens/plate/PlateDetail';
 import UpdatePlate from '../screens/plate/UpdatePlate';
 import SightingsNavigation from './SightingsNavigation';
+import AddPattern from '../screens/pattern/AddPattern';
+import PatternDetail from '../screens/pattern/PatternDetail';
+import UpdatePattern from '../screens/pattern/UpdatePattern';
+import AddSightings from '../screens/sightings/AddSightings';
 
 export type PlateStackParamList = {
     Home: undefined;
@@ -12,6 +16,10 @@ export type PlateStackParamList = {
     PlateDetail: { plateId: number };
     UpdatePlate: { plateId: number };
     SightingsNav: { sightingsId: number, plateId: number };
+    AddPattern: { plateId: number };
+    PatternDetail: { patternId: number };
+    UpdatePattern: { patternId: number };
+    AddSighting: { plateId?: number };
 };
 
 const Stack = createStackNavigator<PlateStackParamList>();
@@ -29,6 +37,12 @@ const PlateNavigation = () => {
                 component={SightingsNavigation}
                 options={{headerShown: false}}
             />
+            {/* Pattern routes under Plate stack */}
+            <Stack.Screen name="AddPattern" component={AddPattern} options={{ title: 'Add Pattern' }} />
+            <Stack.Screen name="PatternDetail" component={PatternDetail} options={{ title: 'Pattern Details' }} />
+            <Stack.Screen name="UpdatePattern" component={UpdatePattern} options={{ title: 'Update Pattern' }} />
+            {/* Quick Add Sighting from Plate context */}
+            <Stack.Screen name="AddSighting" component={AddSightings} options={{ title: 'Add Sighting' }} />
         </Stack.Navigator>
     );
 };
