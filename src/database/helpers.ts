@@ -73,7 +73,26 @@ export const searchPlates = async (query: string): Promise<Plate[]> => {
   return rows;
 };
 
+// Test function to verify database is working
+export const testDatabase = async (): Promise<boolean> => {
+  try {
+    console.log('Testing database connection...');
+    const result = await executeSql('SELECT 1 as test;');
+    console.log('Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Database connection test failed:', error);
+    return false;
+  }
+};
+
 export const addPlate = async (p: Plate): Promise<Plate> => {
+  // Test database connection first
+  const dbWorking = await testDatabase();
+  if (!dbWorking) {
+    throw new Error('Database connection failed');
+  }
+
   // Auto-generate external_id if missing (format: Country-State-id)
   // For bulk import, external_id should be provided in CSV
   // For Add Plate screen, external_id is auto-generated
@@ -84,28 +103,28 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
     
     try {
       // Count existing plates for this country-state combination
-      const countRes = await executeSql(
+    const countRes = await executeSql(
         'SELECT COUNT(*) as cnt FROM LicensePlate WHERE country = ? AND state = ?;',
         [country, state]
-      );
-      const baseCount = countRes.rows.item(0).cnt as number;
-      let attempt = baseCount + 1;
+    );
+    const baseCount = countRes.rows.item(0).cnt as number;
+    let attempt = baseCount + 1;
 
       // Generate external_id in format "Country-State-id"
-      for (let i = 0; i < 10000; i++) {
+    for (let i = 0; i < 10000; i++) {
         const candidate = `${country}-${state}-${attempt}`;
-        const existsRes = await executeSql(
-          'SELECT 1 FROM LicensePlate WHERE external_id = ? LIMIT 1;',
-          [candidate]
-        );
-        if (existsRes.rows.length === 0) {
-          externalId = candidate;
-          break;
-        }
-        attempt += 1;
+      const existsRes = await executeSql(
+        'SELECT 1 FROM LicensePlate WHERE external_id = ? LIMIT 1;',
+        [candidate]
+      );
+      if (existsRes.rows.length === 0) {
+        externalId = candidate;
+        break;
       }
+      attempt += 1;
+    }
 
-      if (!externalId) {
+    if (!externalId) {
         externalId = `${country}-${state}-${Date.now()}`;
       }
     } catch (error) {
@@ -115,57 +134,95 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
   }
 
   // Validate and sanitize data before insertion
+  // Convert empty strings to null to avoid SQL issues
+  const sanitizeValue = (value: any): string | null => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.toString().trim();
+    return trimmed === '' ? null : trimmed;
+  };
+
   const sanitizedPlate = {
     external_id: externalId,
-    state: (p.state || '').toString().trim(),
-    country: (p.country || '').toString().trim(),
-    name: (p.name || '').toString().trim(),
-    years_available: (p.years_available || '').toString().trim(),
+    state: sanitizeValue(p.state),
+    country: sanitizeValue(p.country),
+    name: sanitizeValue(p.name),
+    years_available: sanitizeValue(p.years_available),
     avail: p.avail ? 1 : 0,
     base: p.base ? 1 : 0,
     embossed: p.embossed ? 1 : 0,
-    num_font: (p.num_font || '').toString().trim(),
-    num_color: (p.num_color || '').toString().trim(),
-    state_font: (p.state_font || '').toString().trim(),
-    state_color: (p.state_color || '').toString().trim(),
-    state_location: (p.state_location || '').toString().trim(),
-    primary_background_colors: (p.primary_background_colors || '').toString().trim(),
-    all_colors: (p.all_colors || '').toString().trim(),
-    background_desc: (p.background_desc || '').toString().trim(),
+    num_font: sanitizeValue(p.num_font),
+    num_color: sanitizeValue(p.num_color),
+    state_font: sanitizeValue(p.state_font),
+    state_color: sanitizeValue(p.state_color),
+    state_location: sanitizeValue(p.state_location),
+    primary_background_colors: sanitizeValue(p.primary_background_colors),
+    all_colors: sanitizeValue(p.all_colors),
+    background_desc: sanitizeValue(p.background_desc),
     county: p.county ? 1 : 0,
     url: p.url ? 1 : 0,
-    text: (p.text || '').toString().trim(),
-    features_tags: (p.features_tags || '').toString().trim(),
-    description: (p.description || '').toString().trim(),
-    notes: (p.notes || '').toString().trim(),
+    text: sanitizeValue(p.text),
+    features_tags: sanitizeValue(p.features_tags),
+    description: sanitizeValue(p.description),
+    notes: sanitizeValue(p.notes),
   };
 
   try {
-    const res = await executeSql(
-      `INSERT INTO LicensePlate (
-        external_id, state, country, name, years_available, avail, base, embossed,
-        num_font, num_color, state_font, state_color, state_location,
-        primary_background_colors, all_colors, background_desc,
-        county, url, text, features_tags, description, notes
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
-      [
-        sanitizedPlate.external_id, sanitizedPlate.state, sanitizedPlate.country, sanitizedPlate.name, sanitizedPlate.years_available,
-        sanitizedPlate.avail, sanitizedPlate.base, sanitizedPlate.embossed,
-        sanitizedPlate.num_font, sanitizedPlate.num_color, sanitizedPlate.state_font, sanitizedPlate.state_color, sanitizedPlate.state_location,
-        sanitizedPlate.primary_background_colors, sanitizedPlate.all_colors, sanitizedPlate.background_desc,
-        sanitizedPlate.county, sanitizedPlate.url, sanitizedPlate.text, sanitizedPlate.features_tags,
-        sanitizedPlate.description, sanitizedPlate.notes,
-      ],
-    );
-    return { ...p, plate_id: res.insertId, external_id: externalId };
+    // Use a much simpler approach - build the query dynamically
+    const columns = [
+      'external_id', 'state', 'country', 'name', 'years_available', 'avail', 'base', 'embossed',
+      'num_font', 'num_color', 'state_font', 'state_color', 'state_location',
+      'primary_background_colors', 'all_colors', 'background_desc',
+      'county', 'url', 'text', 'features_tags', 'description', 'notes'
+    ];
+    
+    const values = [
+      sanitizedPlate.external_id, sanitizedPlate.state, sanitizedPlate.country, sanitizedPlate.name, sanitizedPlate.years_available,
+      sanitizedPlate.avail, sanitizedPlate.base, sanitizedPlate.embossed,
+      sanitizedPlate.num_font, sanitizedPlate.num_color, sanitizedPlate.state_font, sanitizedPlate.state_color, sanitizedPlate.state_location,
+      sanitizedPlate.primary_background_colors, sanitizedPlate.all_colors, sanitizedPlate.background_desc,
+      sanitizedPlate.county, sanitizedPlate.url, sanitizedPlate.text, sanitizedPlate.features_tags,
+      sanitizedPlate.description, sanitizedPlate.notes,
+    ];
+    
+    const placeholders = values.map(() => '?').join(', ');
+    const columnNames = columns.join(', ');
+    
+    const sqlQuery = `INSERT INTO LicensePlate (${columnNames}) VALUES (${placeholders});`;
+    
+    console.log('SQL Query:', sqlQuery);
+    console.log('Values count:', values.length);
+    console.log('Values:', values);
+    
+    const res = await executeSql(sqlQuery, values);
+  return { ...p, plate_id: res.insertId, external_id: externalId };
   } catch (error) {
     console.error('Error inserting plate:', error);
     console.error('Sanitized plate data:', sanitizedPlate);
+    
+    // Let's also check the table structure
+    try {
+      const tableInfo = await executeSql('PRAGMA table_info(LicensePlate);');
+      console.log('Table structure:');
+      for (let i = 0; i < tableInfo.rows.length; i++) {
+        const row = tableInfo.rows.item(i);
+        console.log(`  ${row.name}: ${row.type}`);
+      }
+    } catch (tableError) {
+      console.error('Error getting table info:', tableError);
+    }
+    
     throw error;
   }
 };
 
 export const updatePlate = async (p: Plate): Promise<void> => {
+  // Use the same sanitization function
+  const sanitizeValue = (value: any): string | null => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.toString().trim();
+    return trimmed === '' ? null : trimmed;
+  };
+
   await executeSql(
     `UPDATE LicensePlate SET
       state=?, country=?, name=?, years_available=?, avail=?, base=?, embossed=?,
@@ -174,12 +231,12 @@ export const updatePlate = async (p: Plate): Promise<void> => {
       county=?, url=?, text=?, features_tags=?, description=?, notes=?
      WHERE plate_id=?;`,
     [
-      p.state, p.country, p.name, p.years_available,
+      sanitizeValue(p.state), sanitizeValue(p.country), sanitizeValue(p.name), sanitizeValue(p.years_available),
       p.avail ? 1 : 0, p.base ? 1 : 0, p.embossed ? 1 : 0,
-      p.num_font, p.num_color, p.state_font, p.state_color, p.state_location,
-      p.primary_background_colors, p.all_colors, p.background_desc,
-      p.county ? 1 : 0, p.url ? 1 : 0, p.text, p.features_tags,
-      p.description, p.notes, p.plate_id,
+      sanitizeValue(p.num_font), sanitizeValue(p.num_color), sanitizeValue(p.state_font), sanitizeValue(p.state_color), sanitizeValue(p.state_location),
+      sanitizeValue(p.primary_background_colors), sanitizeValue(p.all_colors), sanitizeValue(p.background_desc),
+      p.county ? 1 : 0, p.url ? 1 : 0, sanitizeValue(p.text), sanitizeValue(p.features_tags),
+      sanitizeValue(p.description), sanitizeValue(p.notes), p.plate_id,
     ],
   );
 };

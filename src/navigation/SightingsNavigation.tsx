@@ -3,7 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import SightingDetail from '../screens/sightings/SightingsDetail';
 import AddSightings from '../screens/sightings/AddSightings';
 import SightingsList from '../screens/sightings/SightingsList';
-import UpdateSighting from '../screens/sightings/UpdateSightings';
+import UpdateSightings from '../screens/sightings/UpdateSightings';
 
 export type SightingsStackParamList = {
   SightingsList: undefined;
@@ -34,7 +34,7 @@ const SightingsNavigation = () => {
       />
       <Stack.Screen
         name="UpdateSighting"
-        component={UpdateSighting}
+        component={UpdateSightings}
         options={{ title: 'Update Sighting' }}
       />
     </Stack.Navigator>
