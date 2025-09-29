@@ -39,23 +39,23 @@ const normalizeRow = (rawRow: any) => {
     state: (lower['state'] || '').toString().trim(),
     country: (lower['country'] || '').toString().trim(),
     name: (lower['name'] || '').toString().trim(),
-    years_available: (lower['years_avai'] || lower['years_available'] || '').toString().trim(),
-    avail: (lower['avail?'] || lower['avail'] || '0').toString().trim() === '1' ? 1 : 0,
-    base: (lower['base'] || '0').toString().trim() === '1' ? 1 : 0,
-    embossed: (lower['embossed'] || '0').toString().trim() === '1' ? 1 : 0,
-    num_font: (lower['num_font'] || '').toString().trim(),
-    num_color: (lower['num_color'] || '').toString().trim(),
+    years_available: (lower['years_available'] || '').toString().trim(),
+    available: (lower['available'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
+    base: (lower['base'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
+    embossed: (lower['embossed'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
+    pattern_font: (lower['pattern_font'] || '').toString().trim(),
+    pattern_color: (lower['pattern_color'] || '').toString().trim(),
     state_font: (lower['state_font'] || '').toString().trim(),
-    state_color: (lower['state_colo'] || lower['state_color'] || '').toString().trim(),
-    state_location: (lower['state_locat'] || lower['state_location'] || '').toString().trim(),
-    primary_background_colors: (lower['primary_ba'] || lower['primary_background_colors'] || '').toString().trim(),
+    state_color: (lower['state_color'] || '').toString().trim(),
+    state_location: (lower['state_location'] || '').toString().trim(),
+    primary_background_colors: (lower['primary_background_colors'] || '').toString().trim(),
     all_colors: (lower['all_colors'] || '').toString().trim(),
-    background_desc: (lower['backgroun'] || lower['background_desc'] || '').toString().trim(),
-    county: (lower['county'] || '0').toString().trim() === '1' ? 1 : 0,
-    url: (lower['url'] || '0').toString().trim() === '1' ? 1 : 0,
+    background_description: (lower['background_description'] || '').toString().trim(),
+    county: (lower['county'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
+    url: (lower['url'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
     text: (lower['text'] || '').toString().trim(),
-    features_tags: (lower['features/ta'] || lower['features_tags'] || '').toString().trim(), // maps to "features/tags"
-    description: (lower['descriptior'] || lower['description'] || '').toString().trim(),
+    tags: (lower['tags'] || '').toString().trim(),
+    additional_description: (lower['additional_description'] || '').toString().trim(),
     notes: (lower['notes'] || '').toString().trim(),
   };
 };
@@ -117,8 +117,10 @@ export default function ImportPlatesCSV() {
           continue;
         }
         
+        console.log('Processing external_id:', ext);
+        
         const exists = await executeSql(
-          'SELECT 1 FROM LicensePlate WHERE LOWER(external_id) = ? LIMIT 1;',
+          'SELECT 1 FROM LicensePlate WHERE external_id = ? LIMIT 1;',
           [ext]
         );
         if (exists.rows.length > 0) {
@@ -126,45 +128,35 @@ export default function ImportPlatesCSV() {
           skippedIds.push(ext);
           continue;
         }
-        await new Promise<void>(async (resolve, reject) => {
-          const database = await db;
-          database.transaction(
-            (tx: any) => {
-              tx.executeSql(
-                `INSERT OR IGNORE INTO LicensePlate (
-              external_id, state, country, name, years_available, avail, base, embossed,
-              num_font, num_color, state_font, state_color, state_location,
-              primary_background_colors, all_colors, background_desc,
-              county, url, text, "features/tags", description, notes
+        try {
+          const result = await executeSql(
+            `INSERT INTO LicensePlate (
+              external_id, state, country, name, years_available, available, base, embossed,
+              pattern_font, pattern_color, state_font, state_color, state_location,
+              primary_background_colors, all_colors, background_description,
+              county, url, text, tags, additional_description, notes
               ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
-                [
-                  row.external_id, row.state, row.country, row.name, row.years_available,
-                  row.avail, row.base, row.embossed,
-                  row.num_font, row.num_color, row.state_font, row.state_color, row.state_location,
-                  row.primary_background_colors, row.all_colors, row.background_desc,
-                  row.county, row.url, row.text, row.features_tags,
-                  row.description, row.notes,
-                ],
-                (_t: any, res: any) => {
-                  if (res.rowsAffected === 1) inserted++;
-                  else {
-                    skipped++;
-                    if (ext) skippedIds.push(ext);
-                  }
-                  resolve();
-                },
-                (_t: any, err: any) => {
-                  console.warn('Insert error for row', row, err);
-                  skipped++;
-                  if (ext) skippedIds.push(ext);
-                  resolve();
-                  return false;
-                }
-              );
-            },
-            (err: any) => reject(err),
+            [
+              row.external_id, row.state, row.country, row.name, row.years_available,
+              row.available, row.base, row.embossed,
+              row.pattern_font, row.pattern_color, row.state_font, row.state_color, row.state_location,
+              row.primary_background_colors, row.all_colors, row.background_description,
+              row.county, row.url, row.text, row.tags,
+              row.additional_description, row.notes,
+            ]
           );
-        });
+          
+          if (result.insertId) {
+            inserted++;
+          } else {
+            skipped++;
+            skippedIds.push(ext);
+          }
+        } catch (error) {
+          console.error('Insert error for row:', row, error);
+          skipped++;
+          skippedIds.push(ext);
+        }
       }
 
       await dispatch(fetchPlates());

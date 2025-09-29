@@ -24,7 +24,7 @@ const AddPlate = () => {
   const [country, setCountry] = useState('');
   const [name, setName] = useState('');
   const [yearsAvailable, setYearsAvailable] = useState('');
-  const [avail, setAvail] = useState(false);
+  const [available, setAvailable] = useState(false);
   const [base, setBase] = useState(false);
   const [embossed, setEmbossed] = useState(false);
   const [primaryBackgroundColors, setPrimaryBackgroundColors] = useState('');
@@ -83,20 +83,20 @@ const AddPlate = () => {
           country,
           name,
           years_available: yearsAvailable,
-          avail,
+          available,
           base,
           embossed,
-          num_font: numFont,
-          num_color: numColor,
+          pattern_font: numFont,
+          pattern_color: numColor,
           state_font: stateFont,
           state_color: stateColor,
           state_location: stateLocation,
           primary_background_colors: primaryBackgroundColors,
           all_colors: selectedColors.length ? selectedColors.join(',') : allColors,
-          background_desc: backgroundDesc,
+          background_description: backgroundDesc,
           text,
-          features_tags: composeFeaturesTags(),
-          description,
+          tags: composeFeaturesTags(),
+          additional_description: description,
           notes,
           county,
           url,
@@ -123,7 +123,7 @@ const AddPlate = () => {
       {/* Booleans as switches */}
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Available</Text>
-        <Switch value={avail} onValueChange={setAvail} />
+        <Switch value={available} onValueChange={setAvailable} />
       </View>
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Base</Text>

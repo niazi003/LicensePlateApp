@@ -90,7 +90,7 @@ const PlateDetail = ({ route }: Props) => {
         </Text>
         <Text style={styles.detail}>
           Available:
-          <Text style={styles.bold}> {plate.avail ? 'Yes' : 'No'}</Text>
+          <Text style={styles.bold}> {plate.available ? 'Yes' : 'No'}</Text>
         </Text>
         <Text style={styles.detail}>
           Base:
@@ -119,7 +119,7 @@ const PlateDetail = ({ route }: Props) => {
         </Text>
         <Text style={styles.detail}>
           Background:
-          <Text style={styles.bold}> {plate.background_desc || '-'}</Text>
+          <Text style={styles.bold}> {plate.background_description || '-'}</Text>
         </Text>
 
         <Text style={styles.detail}>
@@ -127,12 +127,12 @@ const PlateDetail = ({ route }: Props) => {
           <Text style={styles.bold}> {plate.text || '-'} </Text>
         </Text>
         <Text style={styles.detail}>
-          Number Font:
-          <Text style={styles.bold}> {plate.num_font || '-'} </Text>
+          Pattern Font:
+          <Text style={styles.bold}> {plate.pattern_font || '-'} </Text>
         </Text>
         <Text style={styles.detail}>
-          Number Color:
-          <Text style={styles.bold}> {plate.num_color || '-'} </Text>
+          Pattern Color:
+          <Text style={styles.bold}> {plate.pattern_color || '-'} </Text>
         </Text>
         <Text style={styles.detail}>
           State Font:
@@ -149,11 +149,11 @@ const PlateDetail = ({ route }: Props) => {
 
         <Text style={styles.detail}>
           Tags:
-          <Text style={styles.bold}> {plate.features_tags || '-'}</Text>
+          <Text style={styles.bold}> {plate.tags || '-'}</Text>
         </Text>
         <Text style={styles.detail}>
-          Description:
-          <Text style={styles.bold}> {plate.description || '-'}</Text>
+          Additional Description:
+          <Text style={styles.bold}> {plate.additional_description || '-'}</Text>
         </Text>
         <Text style={styles.detail}>
           Notes:
@@ -189,7 +189,7 @@ const PlateDetail = ({ route }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => (navigation as any).navigate('PatternDetail', { patternId: item.pattern_id! })}
+              onPress={() => navigation.navigate('PatternDetail', { patternId: item.pattern_id! })}
             >
               <Text style={styles.itemTitle}>{item.pattern}</Text>
               <Text style={styles.itemSub}>{item.type || '-'}</Text>
@@ -199,7 +199,7 @@ const PlateDetail = ({ route }: Props) => {
         />
         <TouchableOpacity
           style={[styles.button, styles.success]}
-          onPress={() => (navigation as any).navigate('AddPattern', { plateId })}
+          onPress={() => navigation.navigate('AddPattern', { plateId })}
         >
           <Text style={styles.buttonText}>Add Pattern</Text>
         </TouchableOpacity>
@@ -214,7 +214,7 @@ const PlateDetail = ({ route }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => (navigation as any).navigate('SightingDetail', { sightingId: item.sighting_id! })}
+              onPress={() => navigation.navigate('SightingDetail', { sightingId: item.sighting_id! })}
             >
               <Text style={styles.itemTitle}>{item.location || 'Unknown location'}</Text>
               <Text style={styles.itemSub}>{item.time || '-'}</Text>
@@ -224,7 +224,7 @@ const PlateDetail = ({ route }: Props) => {
         />
         <TouchableOpacity
           style={[styles.button, styles.success]}
-          onPress={() => (navigation as any).navigate('AddSighting', { plateId })}
+          onPress={() => navigation.navigate('AddSighting', { plateId })}
         >
           <Text style={styles.buttonText}>Add Sighting</Text>
         </TouchableOpacity>

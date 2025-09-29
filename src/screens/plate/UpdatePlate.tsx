@@ -36,7 +36,7 @@ const UpdatePlate = ({ route }: Props) => {
   const [country, setCountry] = useState('');
   const [name, setName] = useState('');
   const [yearsAvailable, setYearsAvailable] = useState('');
-  const [avail, setAvail] = useState(false);
+  const [available, setAvailable] = useState(false);
   const [base, setBase] = useState(false);
   const [embossed, setEmbossed] = useState(false);
   const [primaryBackgroundColors, setPrimaryBackgroundColors] = useState('');
@@ -84,19 +84,19 @@ const UpdatePlate = ({ route }: Props) => {
       setCountry(plate.country || '');
       setName(plate.name || '');
       setYearsAvailable(plate.years_available || '');
-      setAvail(!!plate.avail);
+      setAvailable(!!plate.available);
       setBase(!!plate.base);
       setEmbossed(!!plate.embossed);
       setPrimaryBackgroundColors(plate.primary_background_colors || '');
       setAllColors(plate.all_colors || '');
-      setBackgroundDesc(plate.background_desc || '');
-      setNumFont(plate.num_font || '');
-      setNumColor(plate.num_color || '');
+      setBackgroundDesc(plate.background_description || '');
+      setNumFont(plate.pattern_font || '');
+      setNumColor(plate.pattern_color || '');
       setStateFont(plate.state_font || '');
       setStateColor(plate.state_color || '');
       setStateLocation((plate.state_location as any) || '');
-      setFeaturesTags(plate.features_tags || '');
-      setDescription(plate.description || '');
+      setFeaturesTags(plate.tags || '');
+      setDescription(plate.additional_description || '');
       setNotes(plate.notes || '');
       setText(plate.text || '');
       setCounty(!!plate.county);
@@ -117,20 +117,20 @@ const UpdatePlate = ({ route }: Props) => {
           country,
           name,
           years_available: yearsAvailable,
-          avail,
+          available,
           base,
           embossed,
-          num_font: numFont,
-          num_color: numColor,
+          pattern_font: numFont,
+          pattern_color: numColor,
           state_font: stateFont,
           state_color: stateColor,
           state_location: stateLocation,
           primary_background_colors: primaryBackgroundColors,
           all_colors: selectedColors.length ? selectedColors.join(',') : allColors,
-          background_desc: backgroundDesc,
+          background_description: backgroundDesc,
           text,
-          features_tags: composeFeaturesTags(),
-          description,
+          tags: composeFeaturesTags(),
+          additional_description: description,
           notes,
           county,
           url,
@@ -155,7 +155,7 @@ const UpdatePlate = ({ route }: Props) => {
 
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Available</Text>
-        <Switch value={avail} onValueChange={setAvail} />
+        <Switch value={available} onValueChange={setAvailable} />
       </View>
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Base</Text>

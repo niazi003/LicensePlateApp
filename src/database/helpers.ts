@@ -8,22 +8,22 @@ export interface Plate {
   country?: string;
   name?: string;
   years_available?: string;
-  avail?: boolean;   // maps to "avail?" INTEGER
+  available?: boolean;   // maps to "available" INTEGER
   base?: boolean;
   embossed?: boolean;
-  num_font?: string;
-  num_color?: string;
+  pattern_font?: string;   // maps to "pattern_font"
+  pattern_color?: string; // maps to "pattern_color"
   state_font?: string;
   state_color?: string;
   state_location?: string;
   primary_background_colors?: string;
   all_colors?: string;
-  background_desc?: string;
+  background_description?: string; // maps to "background_description"
   county?: boolean;
   url?: boolean;
   text?: string;
-  features_tags?: string;   // maps to "features/tags"
-  description?: string;
+  tags?: string;   // maps to "tags"
+  additional_description?: string; // maps to "additional_description"
   notes?: string;
 }
 
@@ -147,41 +147,40 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
     country: sanitizeValue(p.country),
     name: sanitizeValue(p.name),
     years_available: sanitizeValue(p.years_available),
-    avail: p.avail ? 1 : 0,
+    available: p.available ? 1 : 0,
     base: p.base ? 1 : 0,
     embossed: p.embossed ? 1 : 0,
-    num_font: sanitizeValue(p.num_font),
-    num_color: sanitizeValue(p.num_color),
+    pattern_font: sanitizeValue(p.pattern_font),
+    pattern_color: sanitizeValue(p.pattern_color),
     state_font: sanitizeValue(p.state_font),
     state_color: sanitizeValue(p.state_color),
     state_location: sanitizeValue(p.state_location),
     primary_background_colors: sanitizeValue(p.primary_background_colors),
     all_colors: sanitizeValue(p.all_colors),
-    background_desc: sanitizeValue(p.background_desc),
+    background_description: sanitizeValue(p.background_description),
     county: p.county ? 1 : 0,
     url: p.url ? 1 : 0,
     text: sanitizeValue(p.text),
-    features_tags: sanitizeValue(p.features_tags),
-    description: sanitizeValue(p.description),
+    tags: sanitizeValue(p.tags),
+    additional_description: sanitizeValue(p.additional_description),
     notes: sanitizeValue(p.notes),
   };
 
   try {
-    // Use a much simpler approach - build the query dynamically
     const columns = [
-      'external_id', 'state', 'country', 'name', 'years_available', 'avail', 'base', 'embossed',
-      'num_font', 'num_color', 'state_font', 'state_color', 'state_location',
-      'primary_background_colors', 'all_colors', 'background_desc',
-      'county', 'url', 'text', 'features_tags', 'description', 'notes'
+      'external_id', 'state', 'country', 'name', 'years_available', 'available', 'base', 'embossed',
+      'pattern_font', 'pattern_color', 'state_font', 'state_color', 'state_location',
+      'primary_background_colors', 'all_colors', 'background_description',
+      'county', 'url', 'text', 'tags', 'additional_description', 'notes'
     ];
     
     const values = [
       sanitizedPlate.external_id, sanitizedPlate.state, sanitizedPlate.country, sanitizedPlate.name, sanitizedPlate.years_available,
-      sanitizedPlate.avail, sanitizedPlate.base, sanitizedPlate.embossed,
-      sanitizedPlate.num_font, sanitizedPlate.num_color, sanitizedPlate.state_font, sanitizedPlate.state_color, sanitizedPlate.state_location,
-      sanitizedPlate.primary_background_colors, sanitizedPlate.all_colors, sanitizedPlate.background_desc,
-      sanitizedPlate.county, sanitizedPlate.url, sanitizedPlate.text, sanitizedPlate.features_tags,
-      sanitizedPlate.description, sanitizedPlate.notes,
+      sanitizedPlate.available, sanitizedPlate.base, sanitizedPlate.embossed,
+      sanitizedPlate.pattern_font, sanitizedPlate.pattern_color, sanitizedPlate.state_font, sanitizedPlate.state_color, sanitizedPlate.state_location,
+      sanitizedPlate.primary_background_colors, sanitizedPlate.all_colors, sanitizedPlate.background_description,
+      sanitizedPlate.county, sanitizedPlate.url, sanitizedPlate.text, sanitizedPlate.tags,
+      sanitizedPlate.additional_description, sanitizedPlate.notes,
     ];
     
     const placeholders = values.map(() => '?').join(', ');
@@ -199,7 +198,6 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
     console.error('Error inserting plate:', error);
     console.error('Sanitized plate data:', sanitizedPlate);
     
-    // Let's also check the table structure
     try {
       const tableInfo = await executeSql('PRAGMA table_info(LicensePlate);');
       console.log('Table structure:');
@@ -225,18 +223,18 @@ export const updatePlate = async (p: Plate): Promise<void> => {
 
   await executeSql(
     `UPDATE LicensePlate SET
-      state=?, country=?, name=?, years_available=?, avail=?, base=?, embossed=?,
-      num_font=?, num_color=?, state_font=?, state_color=?, state_location=?,
-      primary_background_colors=?, all_colors=?, background_desc=?,
-      county=?, url=?, text=?, features_tags=?, description=?, notes=?
+      state=?, country=?, name=?, years_available=?, available=?, base=?, embossed=?,
+      pattern_font=?, pattern_color=?, state_font=?, state_color=?, state_location=?,
+      primary_background_colors=?, all_colors=?, background_description=?,
+      county=?, url=?, text=?, tags=?, additional_description=?, notes=?
      WHERE plate_id=?;`,
     [
       sanitizeValue(p.state), sanitizeValue(p.country), sanitizeValue(p.name), sanitizeValue(p.years_available),
-      p.avail ? 1 : 0, p.base ? 1 : 0, p.embossed ? 1 : 0,
-      sanitizeValue(p.num_font), sanitizeValue(p.num_color), sanitizeValue(p.state_font), sanitizeValue(p.state_color), sanitizeValue(p.state_location),
-      sanitizeValue(p.primary_background_colors), sanitizeValue(p.all_colors), sanitizeValue(p.background_desc),
-      p.county ? 1 : 0, p.url ? 1 : 0, sanitizeValue(p.text), sanitizeValue(p.features_tags),
-      sanitizeValue(p.description), sanitizeValue(p.notes), p.plate_id,
+      p.available ? 1 : 0, p.base ? 1 : 0, p.embossed ? 1 : 0,
+      sanitizeValue(p.pattern_font), sanitizeValue(p.pattern_color), sanitizeValue(p.state_font), sanitizeValue(p.state_color), sanitizeValue(p.state_location),
+      sanitizeValue(p.primary_background_colors), sanitizeValue(p.all_colors), sanitizeValue(p.background_description),
+      p.county ? 1 : 0, p.url ? 1 : 0, sanitizeValue(p.text), sanitizeValue(p.tags),
+      sanitizeValue(p.additional_description), sanitizeValue(p.notes), p.plate_id,
     ],
   );
 };
