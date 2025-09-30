@@ -48,6 +48,8 @@ export interface Sighting {
   notes?: string;
   image_uri?: string;
   trip?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 //--------------------------Plates----------------------------
@@ -281,7 +283,7 @@ export const getSightingsByPlate = async (plate_id: number): Promise<Sighting[]>
 
 export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
   const res = await executeSql(
-    `INSERT INTO Sighting (plate_id, external_id, location, time, notes, image_uri, trip) VALUES (?,?,?,?,?,?,?);`,
+    `INSERT INTO Sighting (plate_id, external_id, location, time, notes, image_uri, trip, latitude, longitude) VALUES (?,?,?,?,?,?,?,?,?);`,
     [
       sighting.plate_id,
       sighting.external_id,
@@ -290,6 +292,8 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
       sighting.notes,
       sighting.image_uri,
       sighting.trip ?? null,
+      sighting.latitude ?? null,
+      sighting.longitude ?? null,
     ],
   );
   return { ...sighting, sighting_id: res.insertId };
@@ -297,7 +301,7 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
 
 export const updateSighting = async (sighting: Sighting): Promise<void> => {
   await executeSql(
-    `UPDATE Sighting SET external_id=?, location=?, time=?, notes=?, image_uri=?, trip=? WHERE sighting_id=?;`,
+    `UPDATE Sighting SET external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=? WHERE sighting_id=?;`,
     [
       sighting.external_id,
       sighting.location,
@@ -305,6 +309,8 @@ export const updateSighting = async (sighting: Sighting): Promise<void> => {
       sighting.notes,
       sighting.image_uri,
       sighting.trip ?? null,
+      sighting.latitude ?? null,
+      sighting.longitude ?? null,
       sighting.sighting_id,
     ],
   );

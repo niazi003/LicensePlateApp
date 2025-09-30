@@ -9,9 +9,12 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Alert,
+  PermissionsAndroid,
 } from 'react-native';
 import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { Dropdown } from 'react-native-element-dropdown';
+import Geolocation from 'react-native-geolocation-service';
 import * as db from '../../database/helpers';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -43,6 +46,12 @@ const AddSightings = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [showImagePicker, setShowImagePicker] = useState<boolean>(false);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean>(false);
+  const [gettingLocation, setGettingLocation] = useState<boolean>(false);
+  const [locationError, setLocationError] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -56,6 +65,87 @@ const AddSightings = () => {
       setTripItems(tripItemsWithAdd);
     })();
   }, []);
+
+  // Request location permission and get current location automatically
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
+  const requestLocationPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'This app needs access to location to capture GPS coordinates for sightings.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        setLocationPermissionGranted(true);
+        setLocationError(false);
+        // Call getCurrentLocation directly since permission is granted
+        setGettingLocation(true);
+        setLocationError(false);
+        Geolocation.getCurrentPosition(
+          (position) => {
+            setLatitude(position.coords.latitude);
+            setLongitude(position.coords.longitude);
+            setAccuracy(position.coords.accuracy);
+            setGettingLocation(false);
+            setLocationError(false);
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            setGettingLocation(false);
+            setLocationError(true);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 10000,
+          }
+        );
+      } else {
+        setLocationPermissionGranted(false);
+        setLocationError(false);
+      }
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      setLocationPermissionGranted(false);
+      setLocationError(false);
+    }
+  };
+
+  const getCurrentLocation = () => {
+    if (!locationPermissionGranted) {
+      return;
+    }
+
+    setGettingLocation(true);
+    setLocationError(false);
+    Geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude);
+        setLongitude(position.coords.longitude);
+        setAccuracy(position.coords.accuracy);
+        setGettingLocation(false);
+        setLocationError(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        setGettingLocation(false);
+        setLocationError(true);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
+  };
 
   // Load all plates when no plateId is provided (coming from SightingsList)
   useEffect(() => {
@@ -75,7 +165,6 @@ const AddSightings = () => {
       }
     })();
   }, [prefillPlateId]);
-
 
 
   const canSave = useMemo(() => {
@@ -165,6 +254,8 @@ const AddSightings = () => {
           notes,
           image_uri: imageUri || undefined,
           trip: trip || null,
+          latitude: latitude,
+          longitude: longitude,
         })
       ).unwrap();
 
@@ -223,6 +314,36 @@ const AddSightings = () => {
         value={location}
         onChangeText={setLocation}
       />
+
+      {/* GPS Coordinates */}
+      <Text style={styles.label}>GPS Coordinates</Text>
+      {latitude !== null && longitude !== null ? (
+        <View style={styles.coordinatesContainer}>
+          <View style={styles.coordinatesInfo}>
+            <Text style={styles.coordinatesText}>
+              📍 {latitude.toFixed(6)}, {longitude.toFixed(6)}
+            </Text>
+            {accuracy !== null && (
+              <Text style={styles.accuracyText}>
+                Accuracy: ±{accuracy.toFixed(1)}m
+              </Text>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.loadingLocationContainer}>
+          {gettingLocation ? (
+            <>
+              <ActivityIndicator size="small" color="#007bff" style={styles.loadingIndicator} />
+              <Text style={styles.loadingLocationText}>Getting your location...</Text>
+            </>
+          ) : locationError ? (
+            <Text style={styles.errorLocationText}>❌ Location getting failed</Text>
+          ) : (
+            <Text style={styles.noLocationText}>Location not available</Text>
+          )}
+        </View>
+      )}
 
       {/* Notes */}
       <TextInput
@@ -693,6 +814,59 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  coordinatesContainer: {
+    backgroundColor: '#f0f8ff',
+    borderWidth: 1,
+    borderColor: '#007bff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  coordinatesInfo: {
+    flexDirection: 'column',
+  },
+  coordinatesText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  accuracyText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  loadingLocationContainer: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingLocationText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    textAlign: 'center',
+  },
+  errorLocationText: {
+    fontSize: 14,
+    color: '#dc3545',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  noLocationText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  loadingIndicator: {
+    marginTop: 0,
   },
 });
 

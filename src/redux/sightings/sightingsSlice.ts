@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import * as db from '../../database/helpers';
 import {
   Sighting,
   getSightingsByPlate,

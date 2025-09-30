@@ -23,6 +23,8 @@ type RouteProp = {
   params: {
     sightingId: number;
   };
+  key: string;
+  name: string;
 };
 
 const UpdateSightings = () => {
@@ -79,13 +81,6 @@ const UpdateSightings = () => {
     }
   }, [sighting]);
 
-  // Filter trips based on query
-  const filteredTrips = useMemo(() => {
-    if (!tripQuery.trim()) return allTrips;
-    return allTrips.filter(t => 
-      t.toLowerCase().includes(tripQuery.toLowerCase())
-    );
-  }, [allTrips, tripQuery]);
 
   const canSave = useMemo(() => {
     return !!sighting?.plate_id;
@@ -294,7 +289,7 @@ const UpdateSightings = () => {
                   setNewTripName('');
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.addButton]}
@@ -363,7 +358,7 @@ const UpdateSightings = () => {
               style={styles.modalCancelButton}
               onPress={() => setShowImagePicker(false)}
             >
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -385,7 +380,7 @@ const UpdateSightings = () => {
         {saving ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.saveButtonText}>Update Sighting</Text>
+          <Text style={styles.buttonText}>Update Sighting</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -486,11 +481,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#ccc',
   },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
   dropdown: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -571,15 +561,20 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 12,
   },
-  cancelButton: {
+  button: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     flex: 1,
+  },
+  cancelButton: {
     backgroundColor: '#6c757d',
   },
   addButton: {
-    flex: 1,
     backgroundColor: '#28a745',
   },
-  cancelButtonText: {
+  buttonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
@@ -670,11 +665,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  modalCancelText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

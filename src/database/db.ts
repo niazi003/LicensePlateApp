@@ -90,6 +90,8 @@ export const initDB = async (): Promise<void> => {
       notes TEXT,
       image_uri TEXT,
       trip TEXT,
+      latitude REAL,
+      longitude REAL,
       FOREIGN KEY ( plate_id ) REFERENCES LicensePlate( plate_id ) ON DELETE CASCADE
     );
   `);
@@ -107,6 +109,21 @@ export const initDB = async (): Promise<void> => {
   await executeSql(`CREATE INDEX IF NOT EXISTS idx_sighting_plate ON Sighting(plate_id);`);
   await executeSql(`CREATE UNIQUE INDEX IF NOT EXISTS ux_plate_external_id ON LicensePlate(external_id);`);
 
+
+  // Add coordinate columns to existing Sighting table if they don't exist
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN latitude REAL;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('latitude column might already exist');
+  }
+  
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN longitude REAL;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('longitude column might already exist');
+  }
 
   // Seed TripName table from Sighting
   await executeSql(`

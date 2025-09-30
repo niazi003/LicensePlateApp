@@ -214,7 +214,7 @@ const PlateDetail = ({ route }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => navigation.navigate('SightingDetail', { sightingId: item.sighting_id! })}
+              onPress={() => navigation.navigate('SightingDetail', { sightingId: item.sighting_id!, plateId: plateId })}
             >
               <Text style={styles.itemTitle}>{item.location || 'Unknown location'}</Text>
               <Text style={styles.itemSub}>{item.time || '-'}</Text>
