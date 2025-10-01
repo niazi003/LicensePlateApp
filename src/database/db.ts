@@ -125,6 +125,35 @@ export const initDB = async (): Promise<void> => {
     console.log('longitude column might already exist');
   }
 
+  // Add geocoding columns to existing Sighting table if they don't exist
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN city TEXT;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('city column might already exist');
+  }
+  
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN state TEXT;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('state column might already exist');
+  }
+  
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN country TEXT;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('country column might already exist');
+  }
+  
+  try {
+    await executeSql('ALTER TABLE Sighting ADD COLUMN full_address TEXT;');
+  } catch (error) {
+    // Column might already exist, ignore error
+    console.log('full_address column might already exist');
+  }
+
   // Seed TripName table from Sighting
   await executeSql(`
     INSERT OR IGNORE INTO TripName(name)

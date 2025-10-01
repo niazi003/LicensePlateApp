@@ -10,6 +10,7 @@ import {
   SightingsFilter,
   SightingListItem,
 } from '../../database/helpers';
+import { reverseGeocode, GeocodingResult } from '../../services/geocodingService';
 
 // --- Thunks ---
 export const fetchSightingsByPlate = createAsyncThunk(
@@ -19,10 +20,36 @@ export const fetchSightingsByPlate = createAsyncThunk(
   }
 );
 
+export const reverseGeocodeLocation = createAsyncThunk(
+  'sightings/reverseGeocode',
+  async (coordinates: { latitude: number; longitude: number }) => {
+    return await reverseGeocode(coordinates.latitude, coordinates.longitude);
+  }
+);
+
 export const createSighting = createAsyncThunk(
   'sightings/create',
   async (sighting: Sighting) => {
-    return await addSighting(sighting); // should return inserted row with sighting_id
+    let sightingWithGeocoding = { ...sighting };
+    
+    // If we have coordinates but no geocoding data, perform reverse geocoding
+    if (sighting.latitude && sighting.longitude && (!sighting.city || !sighting.state || !sighting.country)) {
+      try {
+        const geocodingResult = await reverseGeocode(sighting.latitude, sighting.longitude);
+        sightingWithGeocoding = {
+          ...sighting,
+          city: geocodingResult.city,
+          state: geocodingResult.state,
+          country: geocodingResult.country,
+          full_address: geocodingResult.fullAddress,
+        };
+      } catch (error) {
+        console.warn('Reverse geocoding failed:', error);
+        // Continue with original sighting data if geocoding fails
+      }
+    }
+    
+    return await addSighting(sightingWithGeocoding); // should return inserted row with sighting_id
   }
 );
 

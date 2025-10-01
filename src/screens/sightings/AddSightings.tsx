@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import * as db from '../../database/helpers';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../redux/store';
-import { createSighting } from '../../redux/sightings/sightingsSlice';
+import { createSighting, reverseGeocodeLocation } from '../../redux/sightings/sightingsSlice';
 
 type ParamList = { AddSighting: { plateId?: number } };
 
@@ -52,6 +52,12 @@ const AddSightings = () => {
   const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean>(false);
   const [gettingLocation, setGettingLocation] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<boolean>(false);
+  const [city, setCity] = useState<string>('');
+  const [state, setState] = useState<string>('');
+  const [country, setCountry] = useState<string>('');
+  const [fullAddress, setFullAddress] = useState<string>('');
+  const [geocodingInProgress, setGeocodingInProgress] = useState<boolean>(false);
+  const [geocodingError, setGeocodingError] = useState<string>('');
 
   useEffect(() => {
     (async () => {
@@ -70,6 +76,61 @@ const AddSightings = () => {
   useEffect(() => {
     requestLocationPermission();
   }, []);
+
+  const performReverseGeocoding = useCallback(async () => {
+    if (!latitude || !longitude) {
+      setGeocodingError('No GPS coordinates available for geocoding');
+      return;
+    }
+
+    console.log('Starting reverse geocoding with coordinates:', { latitude, longitude });
+    setGeocodingInProgress(true);
+    setGeocodingError('');
+
+    try {
+      const result = await dispatch(reverseGeocodeLocation({ latitude, longitude })).unwrap();
+      console.log('Reverse geocoding result:', result);
+      
+      setCity(result.city);
+      setState(result.state);
+      setCountry(result.country);
+      setFullAddress(result.fullAddress);
+      
+      // Also update the location field with a formatted string
+      const locationString = `${result.city}, ${result.state}, ${result.country}`;
+      console.log('Setting location string:', locationString);
+      setLocation(locationString);
+      
+    } catch (error: any) {
+      console.error('Reverse geocoding failed:', error);
+      
+      // Check if it's a network error
+      if (error.message?.includes('NETWORK_ERROR')) {
+        Alert.alert(
+          'No Internet Connection',
+          'Unable to get address from GPS coordinates. Please check your internet connection and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Try Again', onPress: () => performReverseGeocoding() }
+          ]
+        );
+        setGeocodingError('');
+      } else {
+        setGeocodingError(error.message || 'Failed to get address from coordinates');
+      }
+    } finally {
+      setGeocodingInProgress(false);
+    }
+  }, [latitude, longitude, dispatch]);
+
+
+  // Automatically perform reverse geocoding when coordinates are available
+  useEffect(() => {
+    if (latitude && longitude && !city && !state && !country) {
+      console.log('Auto-triggering reverse geocoding for coordinates:', { latitude, longitude });
+      performReverseGeocoding();
+    }
+  }, [latitude, longitude, city, state, country, performReverseGeocoding]);
 
   const requestLocationPermission = async () => {
     try {
@@ -96,6 +157,12 @@ const AddSightings = () => {
             setAccuracy(position.coords.accuracy);
             setGettingLocation(false);
             setLocationError(false);
+            
+            // Automatically perform reverse geocoding when we get coordinates
+            console.log('GPS coordinates obtained, will auto-geocode:', { 
+              latitude: position.coords.latitude, 
+              longitude: position.coords.longitude 
+            });
           },
           (error) => {
             console.error('Error getting location:', error);
@@ -126,6 +193,14 @@ const AddSightings = () => {
 
     setGettingLocation(true);
     setLocationError(false);
+    
+    // Clear previous geocoding data when refreshing GPS
+    setCity('');
+    setState('');
+    setCountry('');
+    setFullAddress('');
+    setGeocodingError('');
+    
     Geolocation.getCurrentPosition(
       (position) => {
         setLatitude(position.coords.latitude);
@@ -133,6 +208,12 @@ const AddSightings = () => {
         setAccuracy(position.coords.accuracy);
         setGettingLocation(false);
         setLocationError(false);
+        
+        // Automatically perform reverse geocoding when we get coordinates
+        console.log('GPS coordinates obtained, will auto-geocode:', { 
+          latitude: position.coords.latitude, 
+          longitude: position.coords.longitude 
+        });
       },
       (error) => {
         console.error('Error getting location:', error);
@@ -256,6 +337,10 @@ const AddSightings = () => {
           trip: trip || null,
           latitude: latitude,
           longitude: longitude,
+          city: city || null,
+          state: state || null,
+          country: country || null,
+          full_address: fullAddress || null,
         })
       ).unwrap();
 
@@ -268,6 +353,7 @@ const AddSightings = () => {
   };
 
   return (
+    <>
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Add Sighting</Text>
 
@@ -329,6 +415,57 @@ const AddSightings = () => {
               </Text>
             )}
           </View>
+          
+          {/* GPS and Geocoding Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.geocodingButton, styles.refreshButton]}
+              onPress={getCurrentLocation}
+              disabled={gettingLocation}
+            >
+              {gettingLocation ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" style={styles.geocodingLoading} />
+                  <Text style={styles.geocodingButtonText}>Getting GPS...</Text>
+                </>
+              ) : (
+                <Text style={styles.geocodingButtonText}>🔄 Refresh GPS</Text>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.geocodingButton, geocodingInProgress && styles.geocodingButtonDisabled]}
+              onPress={performReverseGeocoding}
+              disabled={geocodingInProgress}
+            >
+              {geocodingInProgress ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" style={styles.geocodingLoading} />
+                  <Text style={styles.geocodingButtonText}>Getting Address...</Text>
+                </>
+              ) : (
+                <Text style={styles.geocodingButtonText}>📍 Get Address</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {/* Geocoding Results */}
+          {(city || state || country || fullAddress) && (
+            <View style={styles.geocodingResults}>
+              <Text style={styles.geocodingResultsTitle}>📍 Address Details:</Text>
+              {city && <Text style={styles.geocodingResultText}>City: {city}</Text>}
+              {state && <Text style={styles.geocodingResultText}>State: {state}</Text>}
+              {country && <Text style={styles.geocodingResultText}>Country: {country}</Text>}
+              {fullAddress && <Text style={styles.geocodingFullAddress}>Full Address: {fullAddress}</Text>}
+            </View>
+          )}
+          
+          {/* Geocoding Error */}
+          {geocodingError && (
+            <View style={styles.geocodingError}>
+              <Text style={styles.geocodingErrorText}>❌ {geocodingError}</Text>
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.loadingLocationContainer}>
@@ -481,6 +618,7 @@ const AddSightings = () => {
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Save Sighting</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 };
 
@@ -867,6 +1005,73 @@ const styles = StyleSheet.create({
   },
   loadingIndicator: {
     marginTop: 0,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  geocodingButton: {
+    backgroundColor: '#28a745',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  refreshButton: {
+    backgroundColor: '#007bff',
+  },
+  geocodingButtonDisabled: {
+    backgroundColor: '#6c757d',
+    opacity: 0.7,
+  },
+  geocodingButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  geocodingLoading: {
+    marginRight: 8,
+  },
+  geocodingResults: {
+    backgroundColor: '#e8f5e8',
+    borderWidth: 1,
+    borderColor: '#28a745',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  geocodingResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#155724',
+    marginBottom: 8,
+  },
+  geocodingResultText: {
+    fontSize: 14,
+    color: '#155724',
+    marginBottom: 4,
+  },
+  geocodingFullAddress: {
+    fontSize: 13,
+    color: '#155724',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  geocodingError: {
+    backgroundColor: '#f8d7da',
+    borderWidth: 1,
+    borderColor: '#dc3545',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  geocodingErrorText: {
+    fontSize: 14,
+    color: '#721c24',
+    fontWeight: '500',
   },
 });
 

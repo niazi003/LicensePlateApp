@@ -50,6 +50,10 @@ export interface Sighting {
   trip?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  full_address?: string | null;
 }
 
 //--------------------------Plates----------------------------
@@ -283,7 +287,7 @@ export const getSightingsByPlate = async (plate_id: number): Promise<Sighting[]>
 
 export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
   const res = await executeSql(
-    `INSERT INTO Sighting (plate_id, external_id, location, time, notes, image_uri, trip, latitude, longitude) VALUES (?,?,?,?,?,?,?,?,?);`,
+    `INSERT INTO Sighting (plate_id, external_id, location, time, notes, image_uri, trip, latitude, longitude, city, state, country, full_address) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);`,
     [
       sighting.plate_id,
       sighting.external_id,
@@ -294,6 +298,10 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
       sighting.trip ?? null,
       sighting.latitude ?? null,
       sighting.longitude ?? null,
+      sighting.city ?? null,
+      sighting.state ?? null,
+      sighting.country ?? null,
+      sighting.full_address ?? null,
     ],
   );
   return { ...sighting, sighting_id: res.insertId };
@@ -301,7 +309,7 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
 
 export const updateSighting = async (sighting: Sighting): Promise<void> => {
   await executeSql(
-    `UPDATE Sighting SET external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=? WHERE sighting_id=?;`,
+    `UPDATE Sighting SET external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=?, city=?, state=?, country=?, full_address=? WHERE sighting_id=?;`,
     [
       sighting.external_id,
       sighting.location,
@@ -311,6 +319,10 @@ export const updateSighting = async (sighting: Sighting): Promise<void> => {
       sighting.trip ?? null,
       sighting.latitude ?? null,
       sighting.longitude ?? null,
+      sighting.city ?? null,
+      sighting.state ?? null,
+      sighting.country ?? null,
+      sighting.full_address ?? null,
       sighting.sighting_id,
     ],
   );

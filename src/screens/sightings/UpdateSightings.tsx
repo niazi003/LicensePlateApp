@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../redux/store';
-import { updateSightingThunk } from '../../redux/sightings/sightingsSlice';
+import { updateSightingThunk, reverseGeocodeLocation } from '../../redux/sightings/sightingsSlice';
 import * as db from '../../database/helpers';
 
 type RouteProp = {
@@ -52,6 +52,16 @@ const UpdateSightings = () => {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [showImagePicker, setShowImagePicker] = useState<boolean>(false);
+  
+  // Geocoding state
+  const [latitude, setLatitude] = useState<number | null>(sighting?.latitude || null);
+  const [longitude, setLongitude] = useState<number | null>(sighting?.longitude || null);
+  const [city, setCity] = useState<string>(sighting?.city || '');
+  const [state, setState] = useState<string>(sighting?.state || '');
+  const [country, setCountry] = useState<string>(sighting?.country || '');
+  const [fullAddress, setFullAddress] = useState<string>(sighting?.full_address || '');
+  const [geocodingInProgress, setGeocodingInProgress] = useState<boolean>(false);
+  const [geocodingError, setGeocodingError] = useState<string>('');
 
   // Load trip names
   useEffect(() => {
@@ -78,6 +88,12 @@ const UpdateSightings = () => {
       setNotes(sighting.notes || '');
       setImageUri(sighting.image_uri || '');
       setTrip(sighting.trip || '');
+      setLatitude(sighting.latitude || null);
+      setLongitude(sighting.longitude || null);
+      setCity(sighting.city || '');
+      setState(sighting.state || '');
+      setCountry(sighting.country || '');
+      setFullAddress(sighting.full_address || '');
     }
   }, [sighting]);
 
@@ -85,6 +101,53 @@ const UpdateSightings = () => {
   const canSave = useMemo(() => {
     return !!sighting?.plate_id;
   }, [sighting?.plate_id]);
+
+  const performReverseGeocoding = useCallback(async () => {
+    if (!latitude || !longitude) {
+      setGeocodingError('No GPS coordinates available for geocoding');
+      return;
+    }
+
+    console.log('Starting reverse geocoding with coordinates:', { latitude, longitude });
+    setGeocodingInProgress(true);
+    setGeocodingError('');
+
+    try {
+      const result = await dispatch(reverseGeocodeLocation({ latitude, longitude })).unwrap();
+      console.log('Reverse geocoding result:', result);
+      
+      setCity(result.city || '');
+      setState(result.state || '');
+      setCountry(result.country || '');
+      setFullAddress(result.fullAddress || '');
+      
+      // Also update the location field with a formatted string
+      const locationString = `${result.city}, ${result.state}, ${result.country}`;
+      console.log('Setting location string:', locationString);
+      setLocation(locationString);
+      
+    } catch (error: any) {
+      console.error('Reverse geocoding failed:', error);
+      
+      // Check if it's a network error
+      if (error.message?.includes('NETWORK_ERROR')) {
+        Alert.alert(
+          'No Internet Connection',
+          'Unable to get address from GPS coordinates. Please check your internet connection and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Try Again', onPress: () => performReverseGeocoding() }
+          ]
+        );
+        setGeocodingError('');
+      } else {
+        setGeocodingError(error.message || 'Failed to get address from coordinates');
+      }
+    } finally {
+      setGeocodingInProgress(false);
+    }
+  }, [latitude, longitude, dispatch]);
+
 
   const handleAddTrip = async () => {
     if (!newTripName.trim()) return;
@@ -173,6 +236,12 @@ const UpdateSightings = () => {
           notes,
           image_uri: imageUri || undefined,
           trip: trip || null,
+          latitude: latitude,
+          longitude: longitude,
+          city: city || null,
+          state: state || null,
+          country: country || null,
+          full_address: fullAddress || null,
         })
       ).unwrap();
 
@@ -194,6 +263,7 @@ const UpdateSightings = () => {
   }
 
   return (
+    <>
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Update Sighting</Text>
 
@@ -215,6 +285,49 @@ const UpdateSightings = () => {
           value={location}
           onChangeText={setLocation}
         />
+        
+        {/* GPS Coordinates Display */}
+        {(latitude && longitude) && (
+          <View style={styles.gpsInfo}>
+            <Text style={styles.gpsInfoText}>
+              📍 GPS: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+            </Text>
+          </View>
+        )}
+        
+        {/* Reverse Geocoding Button */}
+        <TouchableOpacity
+          style={[styles.geocodingButton, geocodingInProgress && styles.geocodingButtonDisabled]}
+          onPress={performReverseGeocoding}
+          disabled={geocodingInProgress}
+        >
+          {geocodingInProgress ? (
+            <>
+              <ActivityIndicator size="small" color="#fff" style={styles.geocodingLoading} />
+              <Text style={styles.geocodingButtonText}>Getting Address...</Text>
+            </>
+          ) : (
+            <Text style={styles.geocodingButtonText}>📍 Get Address from GPS</Text>
+          )}
+        </TouchableOpacity>
+        
+        {/* Geocoding Results */}
+        {(city || state || country || fullAddress) && (
+          <View style={styles.geocodingResults}>
+            <Text style={styles.geocodingResultsTitle}>📍 Address Details:</Text>
+            {city && <Text style={styles.geocodingResultText}>City: {city}</Text>}
+            {state && <Text style={styles.geocodingResultText}>State: {state}</Text>}
+            {country && <Text style={styles.geocodingResultText}>Country: {country}</Text>}
+            {fullAddress && <Text style={styles.geocodingFullAddress}>Full Address: {fullAddress}</Text>}
+          </View>
+        )}
+        
+        {/* Geocoding Error */}
+        {geocodingError && (
+          <View style={styles.geocodingError}>
+            <Text style={styles.geocodingErrorText}>❌ {geocodingError}</Text>
+          </View>
+        )}
       </View>
 
       {/* Time */}
@@ -384,6 +497,7 @@ const UpdateSightings = () => {
         )}
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 };
 
@@ -665,6 +779,78 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  gpsInfo: {
+    backgroundColor: '#e8f4fd',
+    borderWidth: 1,
+    borderColor: '#bee5eb',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  gpsInfoText: {
+    fontSize: 12,
+    color: '#0c5460',
+    textAlign: 'center',
+  },
+  geocodingButton: {
+    backgroundColor: '#28a745',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  geocodingButtonDisabled: {
+    backgroundColor: '#6c757d',
+    opacity: 0.7,
+  },
+  geocodingButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  geocodingLoading: {
+    marginRight: 8,
+  },
+  geocodingResults: {
+    backgroundColor: '#e8f5e8',
+    borderWidth: 1,
+    borderColor: '#28a745',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  geocodingResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#155724',
+    marginBottom: 8,
+  },
+  geocodingResultText: {
+    fontSize: 14,
+    color: '#155724',
+    marginBottom: 4,
+  },
+  geocodingFullAddress: {
+    fontSize: 13,
+    color: '#155724',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  geocodingError: {
+    backgroundColor: '#f8d7da',
+    borderWidth: 1,
+    borderColor: '#dc3545',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  geocodingErrorText: {
+    fontSize: 14,
+    color: '#721c24',
+    fontWeight: '500',
   },
 });
 
