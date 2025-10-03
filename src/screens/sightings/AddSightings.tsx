@@ -34,7 +34,15 @@ const AddSightings = () => {
   const [allPlates, setAllPlates] = useState<db.Plate[]>([]);
   const [plateItems, setPlateItems] = useState<any[]>([]);
   const plate = useSelector((s: RootState) => (plateId ? s.plates.byId[plateId] : undefined));
-  const [time, setTime] = useState<string>(new Date().toISOString());
+  const [time, setTime] = useState<string>(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${month}-${day}-${year} ${hours}:${minutes}`;
+  });
   const [location, setLocation] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -392,7 +400,7 @@ const AddSightings = () => {
       )}
 
       {/* Time & location */}
-      <TextInput style={styles.input} placeholder="Time (ISO)" placeholderTextColor={"gray"} value={time} onChangeText={setTime} />
+      <TextInput style={styles.input} placeholder="Time (MM-DD-YYYY HH:MM)" placeholderTextColor={"gray"} value={time} onChangeText={setTime} />
       <TextInput
         style={styles.input}
         placeholder="Location (city, state)"

@@ -334,11 +334,11 @@ const UpdateSightings = () => {
       <View style={styles.section}>
         <Text style={styles.label}>Time</Text>
         <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD HH:MM"
+          style={[styles.input, styles.readOnlyInput]}
+          placeholder="MM-DD-YYYY HH:MM"
           placeholderTextColor="#999"
           value={time}
-          onChangeText={setTime}
+          editable={false}
         />
       </View>
 
@@ -550,6 +550,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#333',
+  },
+  readOnlyInput: {
+    backgroundColor: '#f5f5f5',
+    color: '#666',
+    borderColor: '#ccc',
   },
   textArea: {
     height: 100,

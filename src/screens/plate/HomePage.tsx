@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Modal, Animated } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { fetchPlates } from '../../redux/plates/platesSlice';
-import { RootState, AppDispatch } from '../../redux/store';
+import { AppDispatch } from '../../redux/store';
 import { useNavigation } from '@react-navigation/native';
 import { PlateStackParamList } from '../../navigation/PlateNavigation';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -22,6 +22,9 @@ const HomePage = () => {
     const [results, setResults] = useState<Plate[]>([]);
     const [searching, setSearching] = useState(false);
     const [actionsOpen, setActionsOpen] = useState(false);
+    const [searchCollapsed, setSearchCollapsed] = useState(false);
+    const [searchHeight] = useState(new Animated.Value(1));
+    const [searchOpacity] = useState(new Animated.Value(1));
 
     useEffect(() => {
         // keep store up to date for detail screens etc.
@@ -61,30 +64,77 @@ const HomePage = () => {
         debouncedSearch(text);
     };
 
+    // Toggle search collapse
+    const toggleSearchCollapse = () => {
+        const toHeight = searchCollapsed ? 1 : 0;
+        const toOpacity = searchCollapsed ? 1 : 0;
+        
+        Animated.parallel([
+            Animated.timing(searchHeight, {
+                toValue: toHeight,
+                duration: 250,
+                useNativeDriver: false,
+            }),
+            Animated.timing(searchOpacity, {
+                toValue: toOpacity,
+                duration: 200,
+                useNativeDriver: false,
+            })
+        ]).start();
+        setSearchCollapsed(!searchCollapsed);
+    };
+
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Search Plates</Text>
-            <TextInput
-                style={styles.search}
-                placeholder="Search by name, state, notes, or external ID"
-                placeholderTextColor={"gray"}
-                value={query}
-                onChangeText={handleTextChange}
-                autoCapitalize='none'
-                autoCorrect={false}
-                clearButtonMode='while-editing'
-            />
-            {searching && (
-                <View style={styles.searchingContainer}>
-                    <Text style={styles.searchingText}>Searching...</Text>
-                </View>
-            )}
-            {!searching && searchQuery && results.length > 0 && (
-                <Text style={styles.resultsCount}>
-                    {results.length} plate{results.length !== 1 ? 's' : ''} found
-                    {results.length === 100 && ' (showing first 100)'}
-                </Text>
-            )}
+            <View style={styles.headerContainer}>
+                <Text style={styles.title}>Search Plates</Text>
+                <TouchableOpacity 
+                    style={[styles.collapseButton, searchCollapsed && styles.collapseButtonCollapsed]} 
+                    onPress={toggleSearchCollapse}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.collapseButtonIcon}>
+                        {searchCollapsed ? '🔍' : '🔽'}
+                    </Text>
+                    <Text style={styles.collapseButtonText}>
+                        {searchCollapsed ? 'Show Search' : 'Hide Search'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+            
+            <Animated.View style={[
+                styles.searchContainer, 
+                { 
+                    height: searchHeight.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 140], // Further reduced to eliminate empty space
+                        extrapolate: 'clamp',
+                    }),
+                    opacity: searchOpacity
+                }
+            ]}>
+                <TextInput
+                    style={styles.search}
+                    placeholder="Search by name, state, notes, or external ID"
+                    placeholderTextColor={"gray"}
+                    value={query}
+                    onChangeText={handleTextChange}
+                    autoCapitalize='none'
+                    autoCorrect={false}
+                    clearButtonMode='while-editing'
+                />
+                {searching && (
+                    <View style={styles.searchingContainer}>
+                        <Text style={styles.searchingText}>Searching...</Text>
+                    </View>
+                )}
+                {!searching && searchQuery && results.length > 0 && (
+                    <Text style={styles.resultsCount}>
+                        {results.length} plate{results.length !== 1 ? 's' : ''} found
+                        {results.length === 100 && ' (showing first 100)'}
+                    </Text>
+                )}
+            </Animated.View>
             <FlatList
                 data={results}
                 keyExtractor={item => item.plate_id!.toString()}
@@ -93,6 +143,8 @@ const HomePage = () => {
                 updateCellsBatchingPeriod={50}
                 initialNumToRender={20}
                 windowSize={10}
+                style={styles.list}
+                contentContainerStyle={styles.listContainer}
                 getItemLayout={(data, index) => ({
                     length: 60, // Approximate height of each item
                     offset: 60 * index,
@@ -177,25 +229,73 @@ const styles = StyleSheet.create({
         padding: 16,
         backgroundColor: '#f5f5f5'
     },
+    headerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        marginBottom: 16,
-        color: '#333'
+        color: '#333',
+        flex: 1,
     },
-    search: {
-        borderWidth: 1,
-        borderColor: '#ddd',
+    collapseButton: {
+        backgroundColor: '#007bff',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#007bff',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+        minWidth: 120,
+    },
+    collapseButtonCollapsed: {
+        backgroundColor: '#6c757d',
+        shadowColor: '#6c757d',
+    },
+    collapseButtonIcon: {
+        fontSize: 16,
+        marginRight: 6,
+    },
+    collapseButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    searchContainer: {
+        marginBottom: 16,
+        overflow: 'hidden',
+        backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
-        fontSize: 16,
-        backgroundColor: '#fff',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 3,
+        elevation: 2,
+    },
+    list: {
+        flex: 1,
+    },
+    listContainer: {
+        flexGrow: 1,
+        paddingBottom: 80, // Space for FAB
+    },
+    search: {
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        fontSize: 16,
+        backgroundColor: '#fafafa',
     },
     searchingContainer: {
         backgroundColor: '#e3f2fd',
