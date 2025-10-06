@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import {
   Sighting,
+  getSightingById,
   getSightingsByPlate,
   addSighting,
   updateSighting,
@@ -13,6 +14,17 @@ import {
 import { reverseGeocode, GeocodingResult } from '../../services/geocodingService';
 
 // --- Thunks ---
+export const fetchSightingById = createAsyncThunk(
+  'sightings/fetchById',
+  async (sighting_id: number) => {
+    const sighting = await getSightingById(sighting_id);
+    if (!sighting) {
+      throw new Error('Sighting not found');
+    }
+    return sighting;
+  }
+);
+
 export const fetchSightingsByPlate = createAsyncThunk(
   'sightings/fetchByPlate',
   async (plate_id: number) => {
@@ -102,6 +114,13 @@ const sightingsSlice = createSlice({
   reducers: {},
   extraReducers: builder => {
     builder
+      .addCase(fetchSightingById.fulfilled, (state, action: PayloadAction<Sighting>) => {
+        const sighting = action.payload;
+        state.byId[sighting.sighting_id!] = sighting;
+        if (!state.allIds.includes(sighting.sighting_id!)) {
+          state.allIds.push(sighting.sighting_id!);
+        }
+      })
       .addCase(fetchSightingsByPlate.fulfilled, (state, action: PayloadAction<{ plate_id: number; sightings: Sighting[] }>) => {
         action.payload.sightings.forEach(s => {
           state.byId[s.sighting_id!] = s;

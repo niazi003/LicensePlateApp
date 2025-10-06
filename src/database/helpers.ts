@@ -278,6 +278,12 @@ export const deletePattern = async (pattern_id: number): Promise<void> => {
 
 // -------------------- Sightings -------------------------------------------------
 
+export const getSightingById = async (sighting_id: number): Promise<Sighting | null> => {
+  const res = await executeSql('SELECT * FROM Sighting WHERE sighting_id=?;', [sighting_id]);
+  if (res.rows.length === 0) return null;
+  return res.rows.item(0);
+};
+
 export const getSightingsByPlate = async (plate_id: number): Promise<Sighting[]> => {
   const res = await executeSql('SELECT * FROM Sighting WHERE plate_id=? ORDER BY time DESC;', [plate_id]);
   const rows: Sighting[] = [];
@@ -337,6 +343,7 @@ export interface SightingsFilter {
   dateTo?: string | null;
   state?: string | null;
   country?: string | null;
+  location?: string | null;
   limit: number;
   offset: number;
 }
@@ -350,10 +357,34 @@ export type SightingListItem = Sighting & {
 export const getSightingsPaged = async (f: SightingsFilter): Promise<SightingListItem[]> => {
   const where: string[] = [];
   const params: any[] = [];
-  if (f.dateFrom) { where.push('s.time >= ?'); params.push(f.dateFrom); }
-  if (f.dateTo) { where.push('s.time <= ?'); params.push(f.dateTo); }
-  if (f.state) { where.push('p.state = ?'); params.push(f.state); }
-  if (f.country) { where.push('p.country = ?'); params.push(f.country); }
+  
+  // Date filtering with proper format handling
+  if (f.dateFrom) { 
+    where.push('DATE(s.time) >= DATE(?)'); 
+    params.push(f.dateFrom); 
+  }
+  if (f.dateTo) { 
+    where.push('DATE(s.time) <= DATE(?)'); 
+    params.push(f.dateTo); 
+  }
+  
+  // State and country filtering (exact match)
+  if (f.state) { 
+    where.push('LOWER(p.state) = LOWER(?)'); 
+    params.push(f.state); 
+  }
+  if (f.country) { 
+    where.push('LOWER(p.country) = LOWER(?)'); 
+    params.push(f.country); 
+  }
+  
+  // Location filtering (partial match)
+  if (f.location) { 
+    where.push('(LOWER(s.location) LIKE LOWER(?) OR LOWER(s.city) LIKE LOWER(?) OR LOWER(s.state) LIKE LOWER(?) OR LOWER(s.country) LIKE LOWER(?))'); 
+    const locationParam = `%${f.location}%`;
+    params.push(locationParam, locationParam, locationParam, locationParam);
+  }
+  
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const res = await executeSql(
     `SELECT s.*, p.name as plate_name, p.state as plate_state, p.country as plate_country
@@ -372,10 +403,34 @@ export const getSightingsPaged = async (f: SightingsFilter): Promise<SightingLis
 export const countSightings = async (f: Omit<SightingsFilter,'limit'|'offset'>): Promise<number> => {
   const where: string[] = [];
   const params: any[] = [];
-  if (f.dateFrom) { where.push('s.time >= ?'); params.push(f.dateFrom); }
-  if (f.dateTo) { where.push('s.time <= ?'); params.push(f.dateTo); }
-  if (f.state) { where.push('p.state = ?'); params.push(f.state); }
-  if (f.country) { where.push('p.country = ?'); params.push(f.country); }
+  
+  // Date filtering with proper format handling
+  if (f.dateFrom) { 
+    where.push('DATE(s.time) >= DATE(?)'); 
+    params.push(f.dateFrom); 
+  }
+  if (f.dateTo) { 
+    where.push('DATE(s.time) <= DATE(?)'); 
+    params.push(f.dateTo); 
+  }
+  
+  // State and country filtering (exact match)
+  if (f.state) { 
+    where.push('LOWER(p.state) = LOWER(?)'); 
+    params.push(f.state); 
+  }
+  if (f.country) { 
+    where.push('LOWER(p.country) = LOWER(?)'); 
+    params.push(f.country); 
+  }
+  
+  // Location filtering (partial match)
+  if (f.location) { 
+    where.push('(LOWER(s.location) LIKE LOWER(?) OR LOWER(s.city) LIKE LOWER(?) OR LOWER(s.state) LIKE LOWER(?) OR LOWER(s.country) LIKE LOWER(?))'); 
+    const locationParam = `%${f.location}%`;
+    params.push(locationParam, locationParam, locationParam, locationParam);
+  }
+  
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const res = await executeSql(
     `SELECT COUNT(*) as cnt
