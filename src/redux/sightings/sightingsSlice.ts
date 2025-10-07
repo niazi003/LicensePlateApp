@@ -12,6 +12,7 @@ import {
   SightingListItem,
 } from '../../database/helpers';
 import { reverseGeocode, GeocodingResult } from '../../services/geocodingService';
+import { updatePlateThunk, deletePlateThunk } from '../plates/platesSlice';
 
 // --- Thunks ---
 export const fetchSightingById = createAsyncThunk(
@@ -166,6 +167,54 @@ const sightingsSlice = createSlice({
       })
       .addCase(fetchSightingsPaged.rejected, state => {
         state.loading = false;
+      })
+      // Listen for plate updates to refresh sightings list
+      .addCase(updatePlateThunk.fulfilled, (state, action) => {
+        const updatedPlate = action.payload;
+        // Update sightings list items that reference this plate
+        state.list = state.list.map(item => {
+          if (item.plate_id === updatedPlate.plate_id) {
+            return {
+              ...item,
+              plate_name: updatedPlate.name,
+              plate_state: updatedPlate.state,
+              plate_country: updatedPlate.country,
+            };
+          }
+          return item;
+        });
+        
+        // Update individual sightings that reference this plate
+        Object.keys(state.byId).forEach(sightingId => {
+          const sighting = state.byId[parseInt(sightingId)];
+          if (sighting.plate_id === updatedPlate.plate_id) {
+            // Update the sighting with new plate information
+            state.byId[parseInt(sightingId)] = {
+              ...sighting,
+              // Note: We don't store plate details in sighting objects,
+              // but this ensures the sighting is marked as updated
+            };
+          }
+        });
+      })
+      // Listen for plate deletions to remove affected sightings
+      .addCase(deletePlateThunk.fulfilled, (state, action) => {
+        const deletedPlateId = action.payload;
+        const affectedSightings = state.list.filter(item => item.plate_id === deletedPlateId);
+        
+        // Remove sightings that reference the deleted plate from list
+        state.list = state.list.filter(item => item.plate_id !== deletedPlateId);
+        
+        // Remove sightings from byId state
+        affectedSightings.forEach(sighting => {
+          if (sighting.sighting_id) {
+            delete state.byId[sighting.sighting_id];
+            state.allIds = state.allIds.filter(id => id !== sighting.sighting_id);
+          }
+        });
+        
+        // Update total count
+        state.total = Math.max(0, state.total - affectedSightings.length);
       });
   },
 });

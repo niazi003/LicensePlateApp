@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { PlateStackParamList } from '../../navigation/PlateNavigation';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as db from '../../database/helpers';
+import ClearableTextInput from '../../components/ClearableTextInput';
 
 import ImportPlatesCSV from './ImportPlatesCSV';
 import { Plate } from '../../database/helpers';
@@ -113,7 +114,7 @@ const HomePage = () => {
                     opacity: searchOpacity
                 }
             ]}>
-                <TextInput
+                <ClearableTextInput
                     style={styles.search}
                     placeholder="Search by name, state, notes, or external ID"
                     placeholderTextColor={"gray"}
@@ -121,7 +122,6 @@ const HomePage = () => {
                     onChangeText={handleTextChange}
                     autoCapitalize='none'
                     autoCorrect={false}
-                    clearButtonMode='while-editing'
                 />
                 {searching && (
                     <View style={styles.searchingContainer}>

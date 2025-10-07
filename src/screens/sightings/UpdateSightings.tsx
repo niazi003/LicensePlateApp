@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   Image,
   Modal,
 } from 'react-native';
+import ClearableTextInput from '../../components/ClearableTextInput';
 import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -35,9 +35,6 @@ const UpdateSightings = () => {
 
   // Get sighting from Redux state
   const sighting = useSelector((state: RootState) => state.sightings.byId[sightingId]);
-  const plate = useSelector((state: RootState) => 
-    sighting?.plate_id ? state.plates.byId[sighting.plate_id] : undefined
-  );
 
   // Form state
   const [location, setLocation] = useState('');
@@ -53,9 +50,19 @@ const UpdateSightings = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [showImagePicker, setShowImagePicker] = useState<boolean>(false);
   
+  // Plate selection state
+  const [selectedPlateId, setSelectedPlateId] = useState<number | null>(null);
+  const [_allPlates, setAllPlates] = useState<any[]>([]);
+  const [plateItems, setPlateItems] = useState<any[]>([]);
+  
   // Geocoding state
   const [latitude, setLatitude] = useState<number | null>(sighting?.latitude || null);
   const [longitude, setLongitude] = useState<number | null>(sighting?.longitude || null);
+  const [coordinatesString, setCoordinatesString] = useState<string>(
+    sighting?.latitude && sighting?.longitude 
+      ? `${sighting.latitude}, ${sighting.longitude}` 
+      : ''
+  );
   const [city, setCity] = useState<string>(sighting?.city || '');
   const [state, setState] = useState<string>(sighting?.state || '');
   const [country, setCountry] = useState<string>(sighting?.country || '');
@@ -70,12 +77,30 @@ const UpdateSightings = () => {
         const list = await db.getTripNames().catch(async () => await db.getAllTripNames());
         setAllTrips(list);
         const tripItemsWithAdd = [
-          ...list.map(trip => ({ label: trip, value: trip })),
+          ...list.map(tripName => ({ label: tripName, value: tripName })),
           { label: '+ Add New Trip', value: 'ADD_NEW' }
         ];
         setTripItems(tripItemsWithAdd);
       } catch (error) {
         console.error('Error loading trip names:', error);
+      }
+    })();
+  }, []);
+
+  // Load plates for selection
+  useEffect(() => {
+    (async () => {
+      try {
+        const plates = await db.getAllPlates();
+        setAllPlates(plates);
+        const newPlateItems = plates.map(plateItem => ({
+          label: `${plateItem.name} (${plateItem.state}, ${plateItem.country})`,
+          value: plateItem.plate_id,
+          plate: plateItem
+        }));
+        setPlateItems(newPlateItems);
+      } catch (error) {
+        console.error('Error loading plates:', error);
       }
     })();
   }, []);
@@ -90,17 +115,39 @@ const UpdateSightings = () => {
       setTrip(sighting.trip || '');
       setLatitude(sighting.latitude || null);
       setLongitude(sighting.longitude || null);
+      setCoordinatesString(
+        sighting.latitude && sighting.longitude 
+          ? `${sighting.latitude}, ${sighting.longitude}` 
+          : ''
+      );
       setCity(sighting.city || '');
       setState(sighting.state || '');
       setCountry(sighting.country || '');
       setFullAddress(sighting.full_address || '');
+      setSelectedPlateId(sighting.plate_id || null);
     }
   }, [sighting]);
 
 
   const canSave = useMemo(() => {
-    return !!sighting?.plate_id;
-  }, [sighting?.plate_id]);
+    return !!selectedPlateId;
+  }, [selectedPlateId]);
+
+  const handleCoordinatesChange = (value: string) => {
+    setCoordinatesString(value);
+    
+    // Parse the coordinates string (format: "lat, lng" or "lat,lng")
+    const parts = value.split(',').map(part => part.trim());
+    if (parts.length === 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      setLatitude(isNaN(lat) ? null : lat);
+      setLongitude(isNaN(lng) ? null : lng);
+    } else {
+      setLatitude(null);
+      setLongitude(null);
+    }
+  };
 
   const performReverseGeocoding = useCallback(async () => {
     if (!latitude || !longitude) {
@@ -160,7 +207,7 @@ const UpdateSightings = () => {
       const updatedTrips = [...allTrips, newTripName.trim()];
       setAllTrips(updatedTrips);
       const tripItemsWithAdd = [
-        ...updatedTrips.map(trip => ({ label: trip, value: trip })),
+        ...updatedTrips.map(tripName => ({ label: tripName, value: tripName })),
         { label: '+ Add New Trip', value: 'ADD_NEW' }
       ];
       setTripItems(tripItemsWithAdd);
@@ -230,7 +277,7 @@ const UpdateSightings = () => {
       await dispatch(
         updateSightingThunk({
           sighting_id: sightingId,
-          plate_id: sighting.plate_id,
+          plate_id: selectedPlateId!,
           location,
           time,
           notes,
@@ -267,18 +314,45 @@ const UpdateSightings = () => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Update Sighting</Text>
 
-      {/* Plate information (read-only) */}
+      {/* Plate selection */}
       <View style={styles.section}>
-        <Text style={styles.label}>Plate</Text>
-        <Text style={styles.plateInfo}>
-          {plate?.name} ({plate?.state}, {plate?.country})
-        </Text>
+        <Text style={styles.label}>Plate *</Text>
+        <Dropdown
+          data={plateItems}
+          value={selectedPlateId}
+          onChange={(item) => {
+            setSelectedPlateId(item.value);
+          }}
+          labelField="label"
+          valueField="value"
+          placeholder="Select a plate"
+          search
+          searchPlaceholder="Search plates..."
+          style={styles.dropdown}
+          placeholderStyle={styles.placeholderStyle}
+          selectedTextStyle={styles.selectedTextStyle}
+          inputSearchStyle={styles.inputSearchStyle}
+          iconStyle={styles.iconStyle}
+          containerStyle={styles.dropdownContainer}
+          itemContainerStyle={styles.listItemContainer}
+          itemTextStyle={styles.listItemText}
+          renderRightIcon={() => (
+            <Text style={styles.dropdownIcon}>▼</Text>
+          )}
+          renderItem={(item) => (
+            <View style={styles.listItemContainer}>
+              <Text style={styles.listItemText}>
+                {item.label}
+              </Text>
+            </View>
+          )}
+        />
       </View>
 
       {/* Location */}
       <View style={styles.section}>
         <Text style={styles.label}>Location *</Text>
-        <TextInput
+        <ClearableTextInput
           style={styles.input}
           placeholder="Enter location"
           placeholderTextColor="#999"
@@ -286,14 +360,18 @@ const UpdateSightings = () => {
           onChangeText={setLocation}
         />
         
-        {/* GPS Coordinates Display */}
-        {(latitude && longitude) && (
-          <View style={styles.gpsInfo}>
-            <Text style={styles.gpsInfoText}>
-              📍 GPS: {latitude.toFixed(6)}, {longitude.toFixed(6)}
-            </Text>
-          </View>
-        )}
+        {/* GPS Coordinates Input */}
+        <View style={styles.coordinatesContainer}>
+          <Text style={styles.coordinatesLabel}>GPS Coordinates</Text>
+          <ClearableTextInput
+            style={styles.coordinatesInput}
+            placeholder="e.g., 40.7128, -74.0060"
+            placeholderTextColor="#999"
+            value={coordinatesString}
+            onChangeText={handleCoordinatesChange}
+            keyboardType="numeric"
+          />
+        </View>
         
         {/* Reverse Geocoding Button */}
         <TouchableOpacity
@@ -333,12 +411,12 @@ const UpdateSightings = () => {
       {/* Time */}
       <View style={styles.section}>
         <Text style={styles.label}>Time</Text>
-        <TextInput
-          style={[styles.input, styles.readOnlyInput]}
+        <ClearableTextInput
+          style={styles.input}
           placeholder="MM-DD-YYYY HH:MM"
           placeholderTextColor="#999"
           value={time}
-          editable={false}
+          onChangeText={setTime}
         />
       </View>
 
@@ -386,7 +464,7 @@ const UpdateSightings = () => {
         {/* Add Trip Input */}
         {showAddTrip && (
           <View style={styles.addTripContainer}>
-            <TextInput
+            <ClearableTextInput
               style={styles.input}
               placeholder="Enter new trip name"
               placeholderTextColor="gray"
@@ -436,7 +514,7 @@ const UpdateSightings = () => {
       {/* Notes */}
       <View style={styles.section}>
         <Text style={styles.label}>Notes</Text>
-        <TextInput
+        <ClearableTextInput
           style={[styles.input, styles.textArea]}
           placeholder="Enter notes"
           placeholderTextColor="#999"
@@ -856,6 +934,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#721c24',
     fontWeight: '500',
+  },
+  coordinatesContainer: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  coordinatesLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  coordinatesInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
   },
 });
 

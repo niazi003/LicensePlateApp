@@ -315,8 +315,9 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
 
 export const updateSighting = async (sighting: Sighting): Promise<void> => {
   await executeSql(
-    `UPDATE Sighting SET external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=?, city=?, state=?, country=?, full_address=? WHERE sighting_id=?;`,
+    `UPDATE Sighting SET plate_id=?, external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=?, city=?, state=?, country=?, full_address=? WHERE sighting_id=?;`,
     [
+      sighting.plate_id,
       sighting.external_id,
       sighting.location,
       sighting.time,

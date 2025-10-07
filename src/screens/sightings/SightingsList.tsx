@@ -10,6 +10,7 @@ import {
   Animated,
   Image,
 } from 'react-native';
+import ClearableTextInput from '../../components/ClearableTextInput';
 import { useNavigation } from '@react-navigation/native';
 import {
   getSightingsPaged,
@@ -43,15 +44,19 @@ const SightingsList = () => {
   const filterMemo = useMemo(() => {
     let dateFrom = null;
     let dateTo = null;
-    
+
     // Handle month and year filtering
     if (monthFilter.trim() && yearFilter.trim()) {
       // Both month and year specified
       const month = monthFilter.trim();
       const year = yearFilter.trim();
       dateFrom = `${year}-${month.padStart(2, '0')}-01`;
-      const nextMonth = parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
-      const nextYear = parseInt(month, 10) === 12 ? parseInt(year, 10) + 1 : parseInt(year, 10);
+      const nextMonth =
+        parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
+      const nextYear =
+        parseInt(month, 10) === 12
+          ? parseInt(year, 10) + 1
+          : parseInt(year, 10);
       dateTo = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
     } else if (yearFilter.trim()) {
       // Only year specified
@@ -63,11 +68,13 @@ const SightingsList = () => {
       const month = monthFilter.trim();
       const currentYear = new Date().getFullYear();
       dateFrom = `${currentYear}-${month.padStart(2, '0')}-01`;
-      const nextMonth = parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
-      const nextYear = parseInt(month, 10) === 12 ? currentYear + 1 : currentYear;
+      const nextMonth =
+        parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
+      const nextYear =
+        parseInt(month, 10) === 12 ? currentYear + 1 : currentYear;
       dateTo = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
     }
-    
+
     return {
       dateFrom,
       dateTo,
@@ -127,26 +134,30 @@ const SightingsList = () => {
     setFiltersCollapsed(!filtersCollapsed);
   };
 
-
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Sightings</Text>
-        <TouchableOpacity
-          style={[
-            styles.collapseButton,
-            filtersCollapsed && styles.collapseButtonCollapsed,
-          ]}
-          onPress={toggleFiltersCollapse}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.collapseButtonIcon}>
-            {filtersCollapsed ? '🔍' : '🔽'}
-          </Text>
-          <Text style={styles.collapseButtonText}>
-            {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+            <Text style={styles.applyText}>🔄 Refresh</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.collapseButton,
+              filtersCollapsed && styles.collapseButtonCollapsed,
+            ]}
+            onPress={toggleFiltersCollapse}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.collapseButtonIcon}>
+              {filtersCollapsed ? '🔍' : '🔽'}
+            </Text>
+            <Text style={styles.collapseButtonText}>
+              {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Collapsible Filters */}
@@ -181,21 +192,21 @@ const SightingsList = () => {
             keyboardType="numeric"
           />
         </View>
-        <TextInput
+        <ClearableTextInput
           style={styles.input}
           placeholder="Location (City, State, Country)"
           placeholderTextColor={'gray'}
           value={locationFilter}
           onChangeText={setLocationFilter}
         />
-        <TextInput
+        <ClearableTextInput
           style={styles.input}
           placeholder="Plate State"
           placeholderTextColor={'gray'}
           value={stateFilter}
           onChangeText={setStateFilter}
         />
-        <TextInput
+        <ClearableTextInput
           style={styles.input}
           placeholder="Plate Country"
           placeholderTextColor={'gray'}
@@ -235,7 +246,7 @@ const SightingsList = () => {
                   </View>
                 )}
               </View>
-              
+
               {/* Content on the right */}
               <View style={styles.itemTextContainer}>
                 <Text style={styles.locationText}>
@@ -245,7 +256,8 @@ const SightingsList = () => {
                   {item.time || 'No time specified'}
                 </Text>
                 <Text style={styles.plateText}>
-                  {item.plate_name || 'Unknown plate'} · {item.plate_state}, {item.plate_country}
+                  {item.plate_name || 'Unknown plate'} · {item.plate_state},{' '}
+                  {item.plate_country}
                 </Text>
               </View>
             </View>
@@ -255,11 +267,7 @@ const SightingsList = () => {
           loading ? <ActivityIndicator style={styles.loadingIndicator} /> : null
         }
         ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.emptyText}>
-              No sightings
-            </Text>
-          ) : null
+          !loading ? <Text style={styles.emptyText}>No sightings</Text> : null
         }
       />
 
@@ -280,6 +288,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     fontSize: 22,
@@ -345,12 +358,12 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   applyBtn: {
-    backgroundColor: '#007bff',
-    padding: 12,
+    backgroundColor: '#28a745',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 0,
-    shadowColor: '#007bff',
+    shadowColor: '#28a745',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,

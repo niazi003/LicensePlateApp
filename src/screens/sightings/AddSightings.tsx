@@ -12,6 +12,8 @@ import {
   Alert,
   PermissionsAndroid,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ClearableTextInput from '../../components/ClearableTextInput';
 import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { Dropdown } from 'react-native-element-dropdown';
 import Geolocation from 'react-native-geolocation-service';
@@ -22,6 +24,8 @@ import { RootState, AppDispatch } from '../../redux/store';
 import { createSighting, reverseGeocodeLocation } from '../../redux/sightings/sightingsSlice';
 
 type ParamList = { AddSighting: { plateId?: number } };
+
+const LAST_TRIP_KEY = 'lastUsedTrip';
 
 const AddSightings = () => {
   const route = useRoute<RouteProp<ParamList, 'AddSighting'>>();
@@ -67,6 +71,24 @@ const AddSightings = () => {
   const [geocodingInProgress, setGeocodingInProgress] = useState<boolean>(false);
   const [geocodingError, setGeocodingError] = useState<string>('');
 
+  // AsyncStorage functions for last trip
+  const saveLastTrip = async (tripName: string) => {
+    try {
+      await AsyncStorage.setItem(LAST_TRIP_KEY, tripName);
+    } catch (error) {
+      console.error('Error saving last trip:', error);
+    }
+  };
+
+  const loadLastTrip = async (): Promise<string | null> => {
+    try {
+      return await AsyncStorage.getItem(LAST_TRIP_KEY);
+    } catch (error) {
+      console.error('Error loading last trip:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     (async () => {
       // Prefer TripName table; fallback to sightings-derived list
@@ -77,6 +99,12 @@ const AddSightings = () => {
         { label: '+ Add New Trip', value: 'ADD_NEW' }
       ];
       setTripItems(tripItemsWithAdd);
+
+      // Load last used trip from AsyncStorage
+      const lastTrip = await loadLastTrip();
+      if (lastTrip && list.includes(lastTrip)) {
+        setTrip(lastTrip);
+      }
     })();
   }, []);
 
@@ -352,6 +380,11 @@ const AddSightings = () => {
         })
       ).unwrap();
 
+      // Save the trip to AsyncStorage for future autofill
+      if (trip && trip.trim()) {
+        await saveLastTrip(trip.trim());
+      }
+
       navigation.goBack();
     } catch (e: any) {
       setErrorMsg(e?.message || 'Failed to add sighting.');
@@ -400,8 +433,8 @@ const AddSightings = () => {
       )}
 
       {/* Time & location */}
-      <TextInput style={styles.input} placeholder="Time (MM-DD-YYYY HH:MM)" placeholderTextColor={"gray"} value={time} onChangeText={setTime} />
-      <TextInput
+      <ClearableTextInput style={styles.input} placeholder="Time (MM-DD-YYYY HH:MM)" placeholderTextColor={"gray"} value={time} onChangeText={setTime} />
+      <ClearableTextInput
         style={styles.input}
         placeholder="Location (city, state)"
         placeholderTextColor={"gray"}
@@ -491,7 +524,7 @@ const AddSightings = () => {
       )}
 
       {/* Notes */}
-      <TextInput
+      <ClearableTextInput
         style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
         multiline
         placeholder="Notes (required if no plate)"
@@ -558,7 +591,7 @@ const AddSightings = () => {
       {/* Add Trip Input */}
       {showAddTrip && (
         <View style={styles.addTripContainer}>
-          <TextInput
+          <ClearableTextInput
             style={styles.input}
             placeholder="Enter new trip name"
             placeholderTextColor="gray"
