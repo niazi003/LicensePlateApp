@@ -84,10 +84,10 @@ export const deleteSightingThunk = createAsyncThunk(
 
 export const fetchSightingsPaged = createAsyncThunk(
   'sightings/fetchPaged',
-  async (filter: SightingsFilter & { replace: boolean }) => {
-    const total = await countSightings(filter);
-    const rows = await getSightingsPaged(filter);
-    return { rows, total, replace: filter.replace };
+  async (params: { filters?: SightingsFilter; limit: number; offset: number; replace: boolean }) => {
+    const total = await countSightings(params.filters);
+    const rows = await getSightingsPaged({ filters: params.filters, limit: params.limit, offset: params.offset });
+    return { rows, total, replace: params.replace };
   }
 );
 

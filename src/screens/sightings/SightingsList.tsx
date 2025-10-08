@@ -24,97 +24,71 @@ const PAGE_SIZE = 20;
 const SightingsList = () => {
   const navigation = useNavigation<any>();
 
-  // Filters
+  // 🔹 Filters
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
 
-  // Paging
+  // 🔹 Paging & Data
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SightingListItem[]>([]);
 
-  // Collapsible filters
+  // 🔹 Collapsible filters
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [filtersHeight] = useState(new Animated.Value(1));
   const [filtersOpacity] = useState(new Animated.Value(1));
 
-  const filterMemo = useMemo(() => {
-    let dateFrom = null;
-    let dateTo = null;
-
-    // Handle month and year filtering
-    if (monthFilter.trim() && yearFilter.trim()) {
-      // Both month and year specified
-      const month = monthFilter.trim();
-      const year = yearFilter.trim();
-      dateFrom = `${year}-${month.padStart(2, '0')}-01`;
-      const nextMonth =
-        parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
-      const nextYear =
-        parseInt(month, 10) === 12
-          ? parseInt(year, 10) + 1
-          : parseInt(year, 10);
-      dateTo = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
-    } else if (yearFilter.trim()) {
-      // Only year specified
-      const year = yearFilter.trim();
-      dateFrom = `${year}-01-01`;
-      dateTo = `${parseInt(year, 10) + 1}-01-01`;
-    } else if (monthFilter.trim()) {
-      // Only month specified (current year)
-      const month = monthFilter.trim();
-      const currentYear = new Date().getFullYear();
-      dateFrom = `${currentYear}-${month.padStart(2, '0')}-01`;
-      const nextMonth =
-        parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
-      const nextYear =
-        parseInt(month, 10) === 12 ? currentYear + 1 : currentYear;
-      dateTo = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
-    }
-
-    return {
-      dateFrom,
-      dateTo,
-      state: stateFilter.trim() || null,
-      country: countryFilter.trim() || null,
-      location: locationFilter.trim() || null,
+  // 🔹 Prepare filters (memoized)
+  const filters = useMemo(() => {
+    const f: SightingsFilter = {
+      month: monthFilter.trim(),
+      year: yearFilter.trim(),
+      state: stateFilter.trim(),
+      country: countryFilter.trim(),
+      location: locationFilter.trim(),
     };
+    return f;
   }, [monthFilter, yearFilter, stateFilter, countryFilter, locationFilter]);
 
+  // 🔹 Load and apply filters
   const load = useCallback(
-    async (nextPage: number, replace: boolean) => {
+    async (nextPage: number, replace: boolean, appliedFilters?: SightingsFilter) => {
       setLoading(true);
       try {
-        const totalCount = await countSightings(filterMemo);
-        setTotal(totalCount);
-        const filter: SightingsFilter = {
-          ...filterMemo,
+        const usedFilters = appliedFilters || filters; // fallback to current filters
+        const totalCount = await countSightings(usedFilters);
+        const allRows = await getSightingsPaged({
+          filters: usedFilters,
           limit: PAGE_SIZE,
           offset: nextPage * PAGE_SIZE,
-        } as any;
-        const rows = await getSightingsPaged(filter);
-        setItems(prev => (replace ? rows : [...prev, ...rows]));
+        });
+
+        setTotal(totalCount);
+        setItems(replace ? allRows : [...items, ...allRows]);
+      } catch (error) {
+        console.error('Error loading sightings:', error);
       } finally {
         setLoading(false);
       }
     },
-    [filterMemo],
+    [items], // depends only on items for pagination merging
   );
 
-  // initial load
+  // 🔹 Initial load (only once)
   useEffect(() => {
     load(0, true);
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // apply filters
+  // 🔹 Apply filters manually
   const applyFilters = () => {
-    load(0, true);
+    load(0, true, filters);
   };
 
-  // Toggle filters collapse
+  // 🔹 Toggle filters collapse
   const toggleFiltersCollapse = () => {
     const toHeight = filtersCollapsed ? 1 : 0;
     const toOpacity = filtersCollapsed ? 1 : 0;
@@ -134,14 +108,20 @@ const SightingsList = () => {
     setFiltersCollapsed(!filtersCollapsed);
   };
 
+  // 🔹 Render
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Sightings</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-            <Text style={styles.applyText}>🔄 Refresh</Text>
+          <TouchableOpacity
+            style={[styles.applyBtn, loading && { opacity: 0.6 }]}
+            onPress={!loading ? () => load(0, true, filters) : undefined}
+            disabled={loading}
+          >
+            <Text style={styles.applyText}>{loading ? 'Loading...' : '🔄 Refresh'}</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.collapseButton,
@@ -160,7 +140,7 @@ const SightingsList = () => {
         </View>
       </View>
 
-      {/* Collapsible Filters */}
+      {/* 🔹 Collapsible Filters */}
       <Animated.View
         style={[
           styles.filtersContainer,
@@ -213,11 +193,16 @@ const SightingsList = () => {
           value={countryFilter}
           onChangeText={setCountryFilter}
         />
-        <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-          <Text style={styles.applyText}>Apply</Text>
+        <TouchableOpacity
+          style={[styles.applyBtn, loading && { opacity: 0.6 }]}
+          onPress={!loading ? applyFilters : undefined}
+          disabled={loading}
+        >
+          <Text style={styles.applyText}>{loading ? 'Loading...' : 'Apply'}</Text>
         </TouchableOpacity>
       </Animated.View>
 
+      {/* 🔹 Sightings List */}
       <FlatList
         data={items}
         keyExtractor={item => item.sighting_id!.toString()}
@@ -232,7 +217,6 @@ const SightingsList = () => {
             }
           >
             <View style={styles.itemContent}>
-              {/* Small image on the left */}
               <View style={styles.imageContainer}>
                 {item.image_uri ? (
                   <Image
@@ -246,8 +230,6 @@ const SightingsList = () => {
                   </View>
                 )}
               </View>
-
-              {/* Content on the right */}
               <View style={styles.itemTextContainer}>
                 <Text style={styles.locationText}>
                   {item.location || 'Unknown location'}
@@ -271,7 +253,7 @@ const SightingsList = () => {
         }
       />
 
-      {/* Optional explicit pagination controls */}
+      {/* 🔹 Footer */}
       <View style={styles.paginationBar}>
         <Text style={styles.pageInfo}>Total Sightings: {total}</Text>
       </View>
@@ -428,13 +410,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  pageBtn: {
-    backgroundColor: '#6c757d',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  pageText: { color: '#fff', fontWeight: '600' },
   pageInfo: { fontSize: 12, color: '#333' },
   loadingIndicator: { marginVertical: 16 },
   emptyText: { textAlign: 'center', marginTop: 24 },

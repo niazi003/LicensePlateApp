@@ -50,7 +50,7 @@ export const reverseGeocode = async (
       if (types.includes('locality') || types.includes('administrative_area_level_2')) {
         city = component.long_name;
       } else if (types.includes('administrative_area_level_1')) {
-        state = component.short_name; // Use short name for state (e.g., "CA" instead of "California")
+        state = component.long_name; // Use short name for state (e.g., "CA" instead of "California")
       } else if (types.includes('country')) {
         country = component.long_name;
       }
@@ -72,7 +72,7 @@ export const reverseGeocode = async (
       for (const component of addressComponents) {
         const types = component.types;
         if (types.includes('administrative_area_level_2')) {
-          state = component.short_name;
+          state = component.long_name;
           break;
         }
       }

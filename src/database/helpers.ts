@@ -79,6 +79,136 @@ export const searchPlates = async (query: string): Promise<Plate[]> => {
   return rows;
 };
 
+export interface PlateFilters {
+  name?: string;
+  state?: string;
+  country?: string;
+  external_id?: string;
+  years_available?: string;
+  available?: boolean | 'all';
+  base?: boolean | 'all';
+  embossed?: boolean | 'all';
+  county?: boolean | 'all';
+  tags?: string;
+  notes?: string;
+  text?: string;
+  colors?: string[];  // Array of selected colors (all_colors + primary_background_colors)
+  primary_background_color?: string;  // Single background color
+  pattern_font?: string;  // Number font
+  state_font?: string;
+  pattern_color?: string;  // Number color
+  state_color?: string;
+}
+
+export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate[]> => {
+  const where: string[] = [];
+  const params: any[] = [];
+
+  // Text-based filters (partial match)
+  // Name filter: fuzzy search - each word must appear in the name
+  if (filters.name?.trim()) {
+    const words = filters.name.trim().split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      const nameConditions = words.map(() => 'LOWER(name) LIKE LOWER(?)').join(' AND ');
+      where.push(`(${nameConditions})`);
+      words.forEach(word => {
+        params.push(`%${word}%`);
+      });
+    }
+  }
+  if (filters.state?.trim()) {
+    where.push('LOWER(state) LIKE LOWER(?)');
+    params.push(`%${filters.state.trim()}%`);
+  }
+  if (filters.country?.trim()) {
+    where.push('LOWER(country) LIKE LOWER(?)');
+    params.push(`%${filters.country.trim()}%`);
+  }
+  if (filters.external_id?.trim()) {
+    where.push('LOWER(external_id) LIKE LOWER(?)');
+    params.push(`%${filters.external_id.trim()}%`);
+  }
+  if (filters.years_available?.trim()) {
+    where.push('years_available LIKE ?');
+    params.push(`%${filters.years_available.trim()}%`);
+  }
+  if (filters.tags?.trim()) {
+    where.push('LOWER(tags) LIKE LOWER(?)');
+    params.push(`%${filters.tags.trim()}%`);
+  }
+  if (filters.notes?.trim()) {
+    where.push('LOWER(notes) LIKE LOWER(?)');
+    params.push(`%${filters.notes.trim()}%`);
+  }
+  if (filters.text?.trim()) {
+    where.push('LOWER(text) LIKE LOWER(?)');
+    params.push(`%${filters.text.trim()}%`);
+  }
+  
+  // Color filters - search in both all_colors and primary_background_colors
+  if (filters.colors && filters.colors.length > 0) {
+    const colorConditions = filters.colors.map(() => 
+      '(LOWER(all_colors) LIKE LOWER(?) OR LOWER(primary_background_colors) LIKE LOWER(?))'
+    ).join(' OR ');
+    where.push(`(${colorConditions})`);
+    filters.colors.forEach(color => {
+      params.push(`%${color}%`, `%${color}%`);
+    });
+  }
+  
+  // Specific filters for plate properties
+  if (filters.primary_background_color?.trim()) {
+    where.push('LOWER(primary_background_colors) LIKE LOWER(?)');
+    params.push(`%${filters.primary_background_color.trim()}%`);
+  }
+  if (filters.pattern_font?.trim()) {
+    where.push('LOWER(pattern_font) LIKE LOWER(?)');
+    params.push(`%${filters.pattern_font.trim()}%`);
+  }
+  if (filters.state_font?.trim()) {
+    where.push('LOWER(state_font) LIKE LOWER(?)');
+    params.push(`%${filters.state_font.trim()}%`);
+  }
+  if (filters.pattern_color?.trim()) {
+    where.push('LOWER(pattern_color) LIKE LOWER(?)');
+    params.push(`%${filters.pattern_color.trim()}%`);
+  }
+  if (filters.state_color?.trim()) {
+    where.push('LOWER(state_color) LIKE LOWER(?)');
+    params.push(`%${filters.state_color.trim()}%`);
+  }
+
+  // Boolean filters
+  if (filters.available !== undefined && filters.available !== 'all') {
+    where.push('available = ?');
+    params.push(filters.available ? 1 : 0);
+  }
+  if (filters.base !== undefined && filters.base !== 'all') {
+    where.push('base = ?');
+    params.push(filters.base ? 1 : 0);
+  }
+  if (filters.embossed !== undefined && filters.embossed !== 'all') {
+    where.push('embossed = ?');
+    params.push(filters.embossed ? 1 : 0);
+  }
+  if (filters.county !== undefined && filters.county !== 'all') {
+    where.push('county = ?');
+    params.push(filters.county ? 1 : 0);
+  }
+
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const res = await executeSql(
+    `SELECT * FROM LicensePlate 
+     ${whereSql}
+     ORDER BY name COLLATE NOCASE
+     LIMIT 200;`,
+    params
+  );
+  const rows: Plate[] = [];
+  for (let i = 0; i < res.rows.length; i++) rows.push(res.rows.item(i));
+  return rows;
+};
+
 // Test function to verify database is working
 export const testDatabase = async (): Promise<boolean> => {
   try {
@@ -340,13 +470,11 @@ export const deleteSighting = async (sighting_id: number): Promise<void> => {
 };
 
 export interface SightingsFilter {
-  dateFrom?: string | null;
-  dateTo?: string | null;
-  state?: string | null;
-  country?: string | null;
-  location?: string | null;
-  limit: number;
-  offset: number;
+  month?: string;
+  year?: string;
+  state?: string;
+  country?: string;
+  location?: string;
 }
 
 export type SightingListItem = Sighting & {
@@ -355,35 +483,44 @@ export type SightingListItem = Sighting & {
   plate_country?: string;
 };
 
-export const getSightingsPaged = async (f: SightingsFilter): Promise<SightingListItem[]> => {
+export const getSightingsPaged = async (params: { filters?: SightingsFilter; limit: number; offset: number }): Promise<SightingListItem[]> => {
   const where: string[] = [];
-  const params: any[] = [];
+  const sqlParams: any[] = [];
+  const f = params.filters || {};
   
-  // Date filtering with proper format handling
-  if (f.dateFrom) { 
-    where.push('DATE(s.time) >= DATE(?)'); 
-    params.push(f.dateFrom); 
-  }
-  if (f.dateTo) { 
-    where.push('DATE(s.time) <= DATE(?)'); 
-    params.push(f.dateTo); 
+  // Month and year filtering
+  // time format is typically "MM-DD-YYYY HH:MM" or similar
+  if (f.month && f.year) {
+    // Match both month and year - time should start with "MM-" and contain the year
+    const monthPadded = f.month.padStart(2, '0');
+    where.push('(SUBSTR(s.time, 1, 2) = ? AND s.time LIKE ?)');
+    sqlParams.push(monthPadded, `%${f.year}%`);
+  } else if (f.month && !f.year) {
+    // Match only month - time should start with "MM-"
+    const monthPadded = f.month.padStart(2, '0');
+    where.push('SUBSTR(s.time, 1, 2) = ?');
+    sqlParams.push(monthPadded);
+  } else if (f.year && !f.month) {
+    // Match only year
+    where.push('s.time LIKE ?');
+    sqlParams.push(`%${f.year}%`);
   }
   
-  // State and country filtering (exact match)
+  // State and country filtering (partial match on plate state/country)
   if (f.state) { 
-    where.push('LOWER(p.state) = LOWER(?)'); 
-    params.push(f.state); 
+    where.push('LOWER(p.state) LIKE LOWER(?)'); 
+    sqlParams.push(`%${f.state}%`); 
   }
   if (f.country) { 
-    where.push('LOWER(p.country) = LOWER(?)'); 
-    params.push(f.country); 
+    where.push('LOWER(p.country) LIKE LOWER(?)'); 
+    sqlParams.push(`%${f.country}%`); 
   }
   
   // Location filtering (partial match)
   if (f.location) { 
     where.push('(LOWER(s.location) LIKE LOWER(?) OR LOWER(s.city) LIKE LOWER(?) OR LOWER(s.state) LIKE LOWER(?) OR LOWER(s.country) LIKE LOWER(?))'); 
     const locationParam = `%${f.location}%`;
-    params.push(locationParam, locationParam, locationParam, locationParam);
+    sqlParams.push(locationParam, locationParam, locationParam, locationParam);
   }
   
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
@@ -394,35 +531,40 @@ export const getSightingsPaged = async (f: SightingsFilter): Promise<SightingLis
      ${whereSql}
      ORDER BY s.time DESC, s.sighting_id DESC
      LIMIT ? OFFSET ?;`,
-    [...params, f.limit, f.offset]
+    [...sqlParams, params.limit, params.offset]
   );
   const rows: SightingListItem[] = [];
   for (let i = 0; i < res.rows.length; i++) rows.push(res.rows.item(i));
   return rows;
 };
 
-export const countSightings = async (f: Omit<SightingsFilter,'limit'|'offset'>): Promise<number> => {
+export const countSightings = async (filters?: SightingsFilter): Promise<number> => {
   const where: string[] = [];
   const params: any[] = [];
+  const f = filters || {};
   
-  // Date filtering with proper format handling
-  if (f.dateFrom) { 
-    where.push('DATE(s.time) >= DATE(?)'); 
-    params.push(f.dateFrom); 
-  }
-  if (f.dateTo) { 
-    where.push('DATE(s.time) <= DATE(?)'); 
-    params.push(f.dateTo); 
+  // Month and year filtering
+  if (f.month && f.year) {
+    const monthPadded = f.month.padStart(2, '0');
+    where.push('(SUBSTR(s.time, 1, 2) = ? AND s.time LIKE ?)');
+    params.push(monthPadded, `%${f.year}%`);
+  } else if (f.month && !f.year) {
+    const monthPadded = f.month.padStart(2, '0');
+    where.push('SUBSTR(s.time, 1, 2) = ?');
+    params.push(monthPadded);
+  } else if (f.year && !f.month) {
+    where.push('s.time LIKE ?');
+    params.push(`%${f.year}%`);
   }
   
-  // State and country filtering (exact match)
+  // State and country filtering (partial match)
   if (f.state) { 
-    where.push('LOWER(p.state) = LOWER(?)'); 
-    params.push(f.state); 
+    where.push('LOWER(p.state) LIKE LOWER(?)'); 
+    params.push(`%${f.state}%`); 
   }
   if (f.country) { 
-    where.push('LOWER(p.country) = LOWER(?)'); 
-    params.push(f.country); 
+    where.push('LOWER(p.country) LIKE LOWER(?)'); 
+    params.push(`%${f.country}%`); 
   }
   
   // Location filtering (partial match)
