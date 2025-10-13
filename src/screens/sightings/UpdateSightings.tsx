@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import ClearableTextInput from '../../components/ClearableTextInput';
 import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
@@ -310,9 +312,17 @@ const UpdateSightings = () => {
   }
 
   return (
-    <>
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Update Sighting</Text>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <Text style={styles.title}>Update Sighting</Text>
 
       {/* Plate selection */}
       <View style={styles.section}>
@@ -574,8 +584,8 @@ const UpdateSightings = () => {
           <Text style={styles.buttonText}>Update Sighting</Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
-    </>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

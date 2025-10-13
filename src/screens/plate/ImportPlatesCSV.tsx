@@ -210,12 +210,15 @@ export default function ImportPlatesCSV() {
         const lower: any = {};
         Object.keys(raw || {}).forEach(k => { lower[k.toLowerCase().trim()] = raw[k]; });
         return {
-          external_id: (lower['external_id'] || '').toString().trim(),
-          pattern: (lower['num_pattern'] || '').toString().trim(),
+          plate_id: (lower['plate_id'] || lower['plate id'] || '').toString().trim(),
+          serial_id: (lower['serial_id_unique_id'] || lower['serial_id'] || '').toString().trim(),
+          unique_id: (lower['unique_id'] || lower['unique id'] || '').toString().trim(),
+          pattern: (lower['pattern'] || lower['num_pattern'] || '').toString().trim(),
+          separator: (lower['separator'] || lower['seperator'] || '').toString().trim(),
           type: (lower['type'] || '').toString().trim(),
-          series_years: (lower['series_years'] || '').toString().trim(),
+          series_years: (lower['years'] || lower['series_years'] || '').toString().trim(),
         };
-      }).filter((r: any) => r.external_id && r.pattern);
+      }).filter((r: any) => r.plate_id && r.pattern);
 
       if (lowerRows.length === 0) {
         Alert.alert('Import', 'No valid rows found (check headers).');
@@ -226,17 +229,17 @@ export default function ImportPlatesCSV() {
       const missingPlates: string[] = [];
 
       for (const row of lowerRows) {
-        const plateIdRes = await executeSql('SELECT plate_id FROM LicensePlate WHERE external_id = ? LIMIT 1;', [row.external_id]);
+        const plateIdRes = await executeSql('SELECT plate_id FROM LicensePlate WHERE external_id = ? LIMIT 1;', [row.plate_id]);
         if (plateIdRes.rows.length === 0) {
-          missingPlates.push(row.external_id);
+          missingPlates.push(row.plate_id);
           continue;
         }
         const plate_id = plateIdRes.rows.item(0).plate_id as number;
         await new Promise<void>((resolve, reject) => {
           (db as any).transaction((tx: any) => {
             tx.executeSql(
-              `INSERT INTO SerialPattern (plate_id, pattern, type, series_years) VALUES (?,?,?,?);`,
-              [plate_id, row.pattern, row.type, row.series_years],
+              `INSERT INTO SerialPattern (plate_id, external_id, serial_id, unique_id, pattern, separator, type, series_years) VALUES (?,?,?,?,?,?,?,?);`,
+              [plate_id, row.plate_id, row.serial_id, row.unique_id, row.pattern, row.separator, row.type, row.series_years],
               () => { inserted++; resolve(); },
               (_t: any, _e: any) => { resolve(); return false; }
             );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Animated, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Animated, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { fetchPlates } from '../../redux/plates/platesSlice';
 import { AppDispatch } from '../../redux/store';
@@ -40,6 +40,10 @@ const HomePage = () => {
         state_font: '',
         pattern_color: '',
         state_color: '',
+        pattern_text: '',
+        pattern_type: '',
+        pattern_separator: '',
+        pattern_years: '',
     });
     const [results, setResults] = useState<Plate[]>([]);
     const [searching, setSearching] = useState(false);
@@ -54,6 +58,7 @@ const HomePage = () => {
     const [stateFontModalOpen, setStateFontModalOpen] = useState(false);
     const [patternColorModalOpen, setPatternColorModalOpen] = useState(false);
     const [stateColorModalOpen, setStateColorModalOpen] = useState(false);
+    const [universalSearch, setUniversalSearch] = useState('');
 
     useEffect(() => {
         // keep store up to date for detail screens etc.
@@ -63,6 +68,7 @@ const HomePage = () => {
     // Check if any filters are active
     useEffect(() => {
         const active = 
+            universalSearch?.trim() ||
             filters.name?.trim() ||
             filters.state?.trim() ||
             filters.country?.trim() ||
@@ -77,22 +83,27 @@ const HomePage = () => {
             filters.state_font?.trim() ||
             filters.pattern_color?.trim() ||
             filters.state_color?.trim() ||
+            filters.pattern_text?.trim() ||
+            filters.pattern_type?.trim() ||
+            filters.pattern_separator?.trim() ||
+            filters.pattern_years?.trim() ||
             (filters.available !== 'all') ||
             (filters.base !== 'all') ||
             (filters.embossed !== 'all') ||
             (filters.county !== 'all');
         setHasActiveFilters(!!active);
-    }, [filters]);
+    }, [filters, universalSearch]);
 
 
     // Debounced search to improve performance
     const debouncedSearch = useMemo(() => {
         let timeoutId: NodeJS.Timeout;
-        return (searchFilters: PlateFilters) => {
+        return (searchFilters: PlateFilters, universalSearchText: string) => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 // Check if any filters are set
                 const active = 
+                    universalSearchText?.trim() ||
                     searchFilters.name?.trim() ||
                     searchFilters.state?.trim() ||
                     searchFilters.country?.trim() ||
@@ -107,6 +118,10 @@ const HomePage = () => {
                     searchFilters.state_font?.trim() ||
                     searchFilters.pattern_color?.trim() ||
                     searchFilters.state_color?.trim() ||
+                    searchFilters.pattern_text?.trim() ||
+                    searchFilters.pattern_type?.trim() ||
+                    searchFilters.pattern_separator?.trim() ||
+                    searchFilters.pattern_years?.trim() ||
                     (searchFilters.available !== 'all') ||
                     (searchFilters.base !== 'all') ||
                     (searchFilters.embossed !== 'all') ||
@@ -117,8 +132,14 @@ const HomePage = () => {
                     return;
                 }
                 
+                // Create effective filters with universalSearch field
+                const effectiveFilters = { 
+                    ...searchFilters,
+                    universalSearch: universalSearchText?.trim() || undefined
+                };
+                
                 setSearching(true);
-                db.searchPlatesAdvanced(searchFilters)
+                db.searchPlatesAdvanced(effectiveFilters)
                     .then((rows) => {
                         setResults(rows);
                     })
@@ -133,7 +154,13 @@ const HomePage = () => {
     const handleFilterChange = (field: keyof PlateFilters, value: any) => {
         const newFilters = { ...filters, [field]: value };
         setFilters(newFilters);
-        debouncedSearch(newFilters);
+        debouncedSearch(newFilters, universalSearch);
+    };
+
+    // Handle universal search changes
+    const handleUniversalSearchChange = (value: string) => {
+        setUniversalSearch(value);
+        debouncedSearch(filters, value);
     };
 
     // Clear all filters
@@ -159,6 +186,7 @@ const HomePage = () => {
             state_color: '',
         };
         setFilters(emptyFilters);
+        setUniversalSearch('');
         setResults([]);
     };
 
@@ -192,8 +220,13 @@ const HomePage = () => {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.headerContainer}>
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardView}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+            <View style={styles.container}>
+                <View style={styles.headerContainer}>
                 <Text style={styles.title}>Filter Plates</Text>
                 <View style={styles.headerButtons}>
                     {hasActiveFilters && (
@@ -219,6 +252,19 @@ const HomePage = () => {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            {/* Universal Search Bar - Always Visible */}
+            <View style={styles.universalSearchContainer}>
+                <ClearableTextInput
+                    style={styles.universalSearchInput}
+                    placeholder="🔍Universal, search by any combination of fields"
+                    placeholderTextColor="#999"
+                    value={universalSearch}
+                    onChangeText={handleUniversalSearchChange}
+                    autoCapitalize='none'
+                    autoCorrect={false}
+                />
+            </View>
             
             <Animated.View style={[
                 styles.filtersContainer, 
@@ -237,6 +283,7 @@ const HomePage = () => {
                     showsVerticalScrollIndicator={true}
                     nestedScrollEnabled={true}
                     bounces={true}
+                    keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.filtersContent}>
                         {/* Primary Filters */}
@@ -556,6 +603,63 @@ const HomePage = () => {
                                 placeholderTextColor="gray"
                                 value={filters.notes || ''}
                                 onChangeText={(val) => handleFilterChange('notes', val)}
+                                autoCapitalize='none'
+                                autoCorrect={false}
+                            />
+                        </View>
+
+                        {/* Pattern Filters */}
+                        <View style={styles.filterSection}>
+                            <Text style={styles.sectionTitle}>🔢 Pattern Filters</Text>
+                            <Text style={styles.sectionSubtitle}>
+                                Find plates by their number patterns
+                            </Text>
+                            
+                            <Text style={styles.filterLabel}>Pattern Text</Text>
+                            <ClearableTextInput
+                                style={styles.filterInput}
+                                placeholder="e.g., #aaa###, ABC123"
+                                placeholderTextColor="gray"
+                                value={filters.pattern_text || ''}
+                                onChangeText={(val) => handleFilterChange('pattern_text', val)}
+                                autoCapitalize='none'
+                                autoCorrect={false}
+                            />
+
+                            <View style={styles.filterRow}>
+                                <View style={styles.filterHalf}>
+                                    <Text style={styles.filterLabel}>Pattern Type</Text>
+                                    <ClearableTextInput
+                                        style={styles.filterInput}
+                                        placeholder="e.g., Passenger"
+                                        placeholderTextColor="gray"
+                                        value={filters.pattern_type || ''}
+                                        onChangeText={(val) => handleFilterChange('pattern_type', val)}
+                                        autoCapitalize='words'
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                                <View style={styles.filterHalf}>
+                                    <Text style={styles.filterLabel}>Separator</Text>
+                                    <ClearableTextInput
+                                        style={styles.filterInput}
+                                        placeholder="e.g., -, space"
+                                        placeholderTextColor="gray"
+                                        value={filters.pattern_separator || ''}
+                                        onChangeText={(val) => handleFilterChange('pattern_separator', val)}
+                                        autoCapitalize='none'
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                            </View>
+
+                            <Text style={styles.filterLabel}>Pattern Years</Text>
+                            <ClearableTextInput
+                                style={styles.filterInput}
+                                placeholder="e.g., 2011-present, 1998-2000"
+                                placeholderTextColor="gray"
+                                value={filters.pattern_years || ''}
+                                onChangeText={(val) => handleFilterChange('pattern_years', val)}
                                 autoCapitalize='none'
                                 autoCorrect={false}
                             />
@@ -888,7 +992,8 @@ const HomePage = () => {
                     </View>
                 </View>
             </Modal>
-        </View>
+            </View>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -912,6 +1017,9 @@ const getColorHex = (colorName: string): string => {
 export default HomePage;
 
 const styles = StyleSheet.create({
+    keyboardView: {
+        flex: 1,
+    },
     container: {
         flex: 1,
         padding: 16,
@@ -978,6 +1086,25 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+    universalSearchContainer: {
+        marginBottom: 12,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    universalSearchInput: {
+        borderWidth: 2,
+        borderColor: '#007bff',
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 16,
+        backgroundColor: '#fff',
+        fontWeight: '500',
+    },
     filtersContainer: {
         marginBottom: 16,
         overflow: 'hidden',
@@ -1010,6 +1137,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 2,
         borderBottomColor: '#007bff',
         paddingBottom: 6,
+    },
+    sectionSubtitle: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 12,
+        marginTop: -8,
+        fontStyle: 'italic',
     },
     filterLabel: {
         fontSize: 14,
@@ -1197,6 +1331,9 @@ const styles = StyleSheet.create({
         marginVertical: 12,
     },
     optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingVertical: 14,
         paddingHorizontal: 12,
         borderBottomWidth: 1,

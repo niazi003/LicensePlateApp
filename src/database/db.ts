@@ -69,10 +69,10 @@ export const initDB = async (): Promise<void> => {
       pattern_id INTEGER PRIMARY KEY AUTOINCREMENT,
       plate_id INTEGER NOT NULL,
       external_id TEXT,
-      serial_id INTEGER,
-      unique_id INTEGER UNIQUE,
+      serial_id TEXT,
+      unique_id TEXT UNIQUE,
       pattern TEXT NOT NULL,
-      seperator TEXT,
+      separator TEXT,
       type TEXT,
       series_years TEXT,
       FOREIGN KEY ( plate_id ) REFERENCES LicensePlate( plate_id ) ON DELETE CASCADE

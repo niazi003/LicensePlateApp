@@ -7,7 +7,7 @@ import UpdatePattern from '../screens/pattern/UpdatePattern';
 
 export type PatternStackParamList = {
   PatternList: undefined;
-  AddPattern: undefined;
+  AddPattern: { plateId?: number };
   PatternDetail: { patternId: number };
   UpdatePattern: { patternId: number };
 };

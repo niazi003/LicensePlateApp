@@ -31,10 +31,10 @@ export interface Pattern {
   pattern_id?: number;
   plate_id: number;
   external_id?: string;
-  serial_id?: number;
-  unique_id?: number;
+  serial_id?: string;
+  unique_id?: string;
   pattern: string;
-  seperator?: string;
+  separator?: string;
   type?: string;
   series_years?: string;
 }
@@ -80,6 +80,7 @@ export const searchPlates = async (query: string): Promise<Plate[]> => {
 };
 
 export interface PlateFilters {
+  universalSearch?: string;  // Searches across multiple string fields with OR logic
   name?: string;
   state?: string;
   country?: string;
@@ -98,11 +99,47 @@ export interface PlateFilters {
   state_font?: string;
   pattern_color?: string;  // Number color
   state_color?: string;
+  // Pattern filters
+  pattern_text?: string;  // Search pattern text (e.g., #aaa###)
+  pattern_type?: string;  // Search pattern type (e.g., Passenger, Truck)
+  pattern_separator?: string;  // Search pattern separator
+  pattern_years?: string;  // Search pattern years
 }
 
 export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate[]> => {
   const where: string[] = [];
   const params: any[] = [];
+
+  // Universal search - fuzzy search across multiple string fields with OR logic
+  // Each word can match any of the searchable fields
+  if (filters.universalSearch?.trim()) {
+    const words = filters.universalSearch.trim().split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      // For each word, create conditions that check if it appears in any field
+      const wordConditions = words.map(() => {
+        const fieldConditions = [
+          'LOWER(name) LIKE LOWER(?)',
+          'LOWER(state) LIKE LOWER(?)',
+          'LOWER(country) LIKE LOWER(?)',
+          'LOWER(external_id) LIKE LOWER(?)',
+          'LOWER(tags) LIKE LOWER(?)',
+          'LOWER(notes) LIKE LOWER(?)',
+          'LOWER(text) LIKE LOWER(?)',
+        ];
+        return `(${fieldConditions.join(' OR ')})`;
+      });
+      
+      // All words must match (AND), but each word can match any field (OR)
+      where.push(`(${wordConditions.join(' AND ')})`);
+      
+      // Add parameters: for each word, add it once for each field condition
+      words.forEach(word => {
+        const wildcardWord = `%${word}%`;
+        // 7 fields = 7 parameters per word
+        params.push(wildcardWord, wildcardWord, wildcardWord, wildcardWord, wildcardWord, wildcardWord, wildcardWord);
+      });
+    }
+  }
 
   // Text-based filters (partial match)
   // Name filter: fuzzy search - each word must appear in the name
@@ -176,6 +213,38 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
   if (filters.state_color?.trim()) {
     where.push('LOWER(state_color) LIKE LOWER(?)');
     params.push(`%${filters.state_color.trim()}%`);
+  }
+
+  // Pattern filters - join with SerialPattern table
+  if (filters.pattern_text?.trim() || filters.pattern_type?.trim() || 
+      filters.pattern_separator?.trim() || filters.pattern_years?.trim()) {
+    // Add pattern filter conditions
+    const patternConditions: string[] = [];
+    
+    if (filters.pattern_text?.trim()) {
+      patternConditions.push('LOWER(sp.pattern) LIKE LOWER(?)');
+      params.push(`%${filters.pattern_text.trim()}%`);
+    }
+    if (filters.pattern_type?.trim()) {
+      patternConditions.push('LOWER(sp.type) LIKE LOWER(?)');
+      params.push(`%${filters.pattern_type.trim()}%`);
+    }
+    if (filters.pattern_separator?.trim()) {
+      patternConditions.push('LOWER(sp.separator) LIKE LOWER(?)');
+      params.push(`%${filters.pattern_separator.trim()}%`);
+    }
+    if (filters.pattern_years?.trim()) {
+      patternConditions.push('sp.series_years LIKE ?');
+      params.push(`%${filters.pattern_years.trim()}%`);
+    }
+    
+    if (patternConditions.length > 0) {
+      where.push(`EXISTS (
+        SELECT 1 FROM SerialPattern sp 
+        WHERE sp.plate_id = LicensePlate.plate_id 
+        AND ${patternConditions.join(' AND ')}
+      )`);
+    }
   }
 
   // Boolean filters
@@ -389,21 +458,73 @@ export const getPatternsByPlate = async (plate_id: number): Promise<Pattern[]> =
 
 export const addPattern = async (pattern: Pattern): Promise<Pattern> => {
   const res = await executeSql(
-    `INSERT INTO SerialPattern (plate_id, external_id, serial_id, unique_id, pattern, seperator, type, series_years) VALUES (?,?,?,?,?,?,?,?);`,
-    [pattern.plate_id, pattern.external_id, pattern.serial_id, pattern.unique_id, pattern.pattern, pattern.seperator, pattern.type, pattern.series_years],
+    `INSERT INTO SerialPattern (plate_id, external_id, serial_id, unique_id, pattern, separator, type, series_years) VALUES (?,?,?,?,?,?,?,?);`,
+    [pattern.plate_id, pattern.external_id, pattern.serial_id, pattern.unique_id, pattern.pattern, pattern.separator, pattern.type, pattern.series_years],
   );
   return { ...pattern, pattern_id: res.insertId };
 };
 
 export const updatePattern = async (pattern: Pattern): Promise<void> => {
   await executeSql(
-    `UPDATE SerialPattern SET pattern=?, seperator=?, type=?, series_years=? WHERE pattern_id=?;`,
-    [pattern.pattern, pattern.seperator, pattern.type, pattern.series_years, pattern.pattern_id],
+    `UPDATE SerialPattern SET external_id=?, serial_id=?, unique_id=?, pattern=?, separator=?, type=?, series_years=? WHERE pattern_id=?;`,
+    [pattern.external_id, pattern.serial_id, pattern.unique_id, pattern.pattern, pattern.separator, pattern.type, pattern.series_years, pattern.pattern_id],
   );
 };
 
 export const deletePattern = async (pattern_id: number): Promise<void> => {
   await executeSql('DELETE FROM SerialPattern WHERE pattern_id=?;', [pattern_id]);
+};
+
+// Helper function to get next serial_id for a plate
+export const getNextSerialId = async (plate_id: number): Promise<string> => {
+  const res = await executeSql(
+    'SELECT COUNT(*) as count FROM SerialPattern WHERE plate_id = ?;',
+    [plate_id]
+  );
+  const count = res.rows.item(0).count as number;
+  return (count + 1).toString();
+};
+
+// Helper function to generate unique_id from plate's external_id and serial_id
+export const generateUniqueId = async (plate_id: number, serial_id: string): Promise<string> => {
+  const plateRes = await executeSql(
+    'SELECT external_id FROM LicensePlate WHERE plate_id = ? LIMIT 1;',
+    [plate_id]
+  );
+  if (plateRes.rows.length === 0) {
+    throw new Error('Plate not found');
+  }
+  const external_id = plateRes.rows.item(0).external_id as string;
+  return `${external_id}-${serial_id}`;
+};
+
+// Renumber all patterns for a plate (recalculate serial_id and unique_id)
+export const renumberPatternsForPlate = async (plate_id: number): Promise<void> => {
+  // Get plate's external_id
+  const plateRes = await executeSql(
+    'SELECT external_id FROM LicensePlate WHERE plate_id = ? LIMIT 1;',
+    [plate_id]
+  );
+  if (plateRes.rows.length === 0) return;
+  const external_id = plateRes.rows.item(0).external_id as string;
+
+  // Get all patterns for this plate, ordered by pattern_id
+  const patternsRes = await executeSql(
+    'SELECT pattern_id FROM SerialPattern WHERE plate_id = ? ORDER BY pattern_id ASC;',
+    [plate_id]
+  );
+
+  // Renumber each pattern sequentially
+  for (let i = 0; i < patternsRes.rows.length; i++) {
+    const pattern_id = patternsRes.rows.item(i).pattern_id as number;
+    const new_serial_id = (i + 1).toString();
+    const new_unique_id = `${external_id}-${new_serial_id}`;
+    
+    await executeSql(
+      'UPDATE SerialPattern SET serial_id = ?, unique_id = ? WHERE pattern_id = ?;',
+      [new_serial_id, new_unique_id, pattern_id]
+    );
+  }
 };
 
 // -------------------- Sightings -------------------------------------------------
@@ -475,6 +596,7 @@ export interface SightingsFilter {
   state?: string;
   country?: string;
   location?: string;
+  trip?: string;
 }
 
 export type SightingListItem = Sighting & {
@@ -521,6 +643,12 @@ export const getSightingsPaged = async (params: { filters?: SightingsFilter; lim
     where.push('(LOWER(s.location) LIKE LOWER(?) OR LOWER(s.city) LIKE LOWER(?) OR LOWER(s.state) LIKE LOWER(?) OR LOWER(s.country) LIKE LOWER(?))'); 
     const locationParam = `%${f.location}%`;
     sqlParams.push(locationParam, locationParam, locationParam, locationParam);
+  }
+  
+  // Trip filtering (partial match)
+  if (f.trip) {
+    where.push('LOWER(s.trip) LIKE LOWER(?)');
+    sqlParams.push(`%${f.trip}%`);
   }
   
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
@@ -572,6 +700,12 @@ export const countSightings = async (filters?: SightingsFilter): Promise<number>
     where.push('(LOWER(s.location) LIKE LOWER(?) OR LOWER(s.city) LIKE LOWER(?) OR LOWER(s.state) LIKE LOWER(?) OR LOWER(s.country) LIKE LOWER(?))'); 
     const locationParam = `%${f.location}%`;
     params.push(locationParam, locationParam, locationParam, locationParam);
+  }
+  
+  // Trip filtering (partial match)
+  if (f.trip) {
+    where.push('LOWER(s.trip) LIKE LOWER(?)');
+    params.push(`%${f.trip}%`);
   }
   
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';

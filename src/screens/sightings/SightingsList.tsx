@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import ClearableTextInput from '../../components/ClearableTextInput';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +19,7 @@ import {
   countSightings,
   SightingsFilter,
   SightingListItem,
+  getAllTripNames,
 } from '../../database/helpers';
 
 const PAGE_SIZE = 20;
@@ -30,6 +33,7 @@ const SightingsList = () => {
   const [stateFilter, setStateFilter] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
+  const [tripFilter, setTripFilter] = useState('');
 
   // 🔹 Paging & Data
   const [total, setTotal] = useState(0);
@@ -41,6 +45,10 @@ const SightingsList = () => {
   const [filtersHeight] = useState(new Animated.Value(1));
   const [filtersOpacity] = useState(new Animated.Value(1));
 
+  // 🔹 Trip modal
+  const [tripModalOpen, setTripModalOpen] = useState(false);
+  const [availableTrips, setAvailableTrips] = useState<string[]>([]);
+
   // 🔹 Prepare filters (memoized)
   const filters = useMemo(() => {
     const f: SightingsFilter = {
@@ -49,9 +57,10 @@ const SightingsList = () => {
       state: stateFilter.trim(),
       country: countryFilter.trim(),
       location: locationFilter.trim(),
+      trip: tripFilter.trim(),
     };
     return f;
-  }, [monthFilter, yearFilter, stateFilter, countryFilter, locationFilter]);
+  }, [monthFilter, yearFilter, stateFilter, countryFilter, locationFilter, tripFilter]);
 
   // 🔹 Load and apply filters
   const load = useCallback(
@@ -80,6 +89,17 @@ const SightingsList = () => {
   // 🔹 Initial load (only once)
   useEffect(() => {
     load(0, true);
+    
+    // Load available trips
+    const loadTrips = async () => {
+      try {
+        const trips = await getAllTripNames();
+        setAvailableTrips(trips);
+      } catch (error) {
+        console.error('Error loading trips:', error);
+      }
+    };
+    loadTrips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -147,7 +167,7 @@ const SightingsList = () => {
           {
             height: filtersHeight.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, 360],
+              outputRange: [0, 420],
               extrapolate: 'clamp',
             }),
             opacity: filtersOpacity,
@@ -179,6 +199,18 @@ const SightingsList = () => {
           value={locationFilter}
           onChangeText={setLocationFilter}
         />
+        <TouchableOpacity 
+          style={styles.tripSelectButton} 
+          onPress={() => setTripModalOpen(true)}
+        >
+          <Text style={[
+            styles.tripSelectText,
+            tripFilter && styles.tripSelectTextActive
+          ]}>
+            {tripFilter || 'Select Trip'}
+          </Text>
+          <Text style={styles.tripSelectArrow}>▼</Text>
+        </TouchableOpacity>
         <ClearableTextInput
           style={styles.input}
           placeholder="Plate State"
@@ -257,6 +289,56 @@ const SightingsList = () => {
       <View style={styles.paginationBar}>
         <Text style={styles.pageInfo}>Total Sightings: {total}</Text>
       </View>
+
+      {/* 🔹 Trip Selection Modal */}
+      <Modal visible={tripModalOpen} transparent animationType="slide" onRequestClose={() => setTripModalOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Trip</Text>
+            <Text style={styles.modalSubtitle}>
+              {availableTrips.length > 0 
+                ? `${availableTrips.length} trip${availableTrips.length !== 1 ? 's' : ''} available`
+                : 'No trips found'}
+            </Text>
+            {availableTrips.length > 0 ? (
+              <ScrollView style={styles.tripList} showsVerticalScrollIndicator={true}>
+                {availableTrips.map(trip => (
+                  <TouchableOpacity 
+                    key={trip} 
+                    style={styles.tripItem} 
+                    onPress={() => { setTripFilter(trip); setTripModalOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.tripItemText}>{trip}</Text>
+                    {tripFilter === trip && (
+                      <Text style={styles.tripCheckmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyTripContainer}>
+                <Text style={styles.emptyTripText}>No trips available</Text>
+                <Text style={styles.emptyTripSubtext}>Add sightings with trip names to use this filter</Text>
+              </View>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonSecondary]} 
+                onPress={() => { setTripFilter(''); setTripModalOpen(false); }}
+              >
+                <Text style={styles.modalButtonTextSecondary}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonPrimary]} 
+                onPress={() => setTripModalOpen(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -352,6 +434,127 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   applyText: { color: '#fff', fontWeight: '600' },
+  tripSelectButton: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+  },
+  tripSelectText: {
+    fontSize: 16,
+    color: '#999',
+    flex: 1,
+  },
+  tripSelectTextActive: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  tripSelectArrow: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  tripList: {
+    maxHeight: 320,
+    marginBottom: 16,
+  },
+  tripItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  tripItemText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    flex: 1,
+  },
+  tripCheckmark: {
+    fontSize: 20,
+    color: '#007bff',
+    fontWeight: '700',
+  },
+  emptyTripContainer: {
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  emptyTripText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptyTripSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#007bff',
+  },
+  modalButtonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#007bff',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalButtonTextSecondary: {
+    color: '#007bff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   item: {
     paddingVertical: 12,
     paddingHorizontal: 8,

@@ -9,6 +9,8 @@ import {
   Alert,
   Switch,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../redux/store';
@@ -145,8 +147,17 @@ const UpdatePlate = ({ route }: Props) => {
   if (!plate) return <Text>Loading...</Text>;
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Update Plate</Text>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <Text style={styles.title}>Update Plate</Text>
 
       <TextInput style={styles.input} placeholder="State" value={stateVal} onChangeText={setStateVal} />
       <TextInput style={styles.input} placeholder="Country" value={country} onChangeText={setCountry} />
@@ -372,7 +383,8 @@ const UpdatePlate = ({ route }: Props) => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

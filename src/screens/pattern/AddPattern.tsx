@@ -10,34 +10,51 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useRoute } from '@react-navigation/native';
 import { AppDispatch, RootState } from '../../redux/store';
 import { createPattern } from '../../redux/patterns/patternsSlice';
 import { fetchPlates } from '../../redux/plates/platesSlice';
 import { selectAllPlatesArray, selectPlatesLoading } from '../../redux/plates/platesSelectors';
-import { Pattern } from '../../database/helpers';
+import { Pattern, getNextSerialId, generateUniqueId } from '../../database/helpers';
 
 interface Plate {
   plate_id?: number;
+  external_id?: string;
   name?: string;
   state?: string;
 }
 
+type AddPatternRoute = {
+  params?: {
+    plateId?: number;
+  };
+};
+
 const AddPattern = () => {
+  const route = useRoute<AddPatternRoute>();
+  const preselectedPlateId = route.params?.plateId;
   const dispatch = useDispatch<AppDispatch>();
   const plates = useSelector(selectAllPlatesArray);
   const platesLoading = useSelector(selectPlatesLoading);
 
   const [formData, setFormData] = useState({
-    plate_id: 0,
+    plate_id: preselectedPlateId || 0,
+    external_id: '',
+    serial_id: '',
+    unique_id: '',
     pattern: '',
+    separator: '',
     type: '',
     series_years: '',
   });
   const [loading, setLoading] = useState(false);
   const [showPlateModal, setShowPlateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
     // Fetch plates when component mounts
@@ -45,6 +62,35 @@ const AddPattern = () => {
       dispatch(fetchPlates());
     }
   }, [dispatch, plates.length]);
+
+  // Auto-generate fields when plate is selected
+  useEffect(() => {
+    const autoGenerateFields = async () => {
+      if (formData.plate_id && formData.plate_id > 0) {
+        setAutoGenerating(true);
+        try {
+          const selectedPlate = plates.find(p => p.plate_id === formData.plate_id);
+          if (!selectedPlate) return;
+
+          const nextSerialId = await getNextSerialId(formData.plate_id);
+          const uniqueId = await generateUniqueId(formData.plate_id, nextSerialId);
+          
+          setFormData(prev => ({
+            ...prev,
+            external_id: selectedPlate.external_id || '',
+            serial_id: nextSerialId,
+            unique_id: uniqueId,
+          }));
+        } catch (error) {
+          console.error('Error auto-generating fields:', error);
+        } finally {
+          setAutoGenerating(false);
+        }
+      }
+    };
+
+    autoGenerateFields();
+  }, [formData.plate_id, plates]);
 
   const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({
@@ -72,7 +118,11 @@ const AddPattern = () => {
     try {
       const patternData: Pattern = {
         plate_id: formData.plate_id,
+        external_id: formData.external_id.trim() || undefined,
+        serial_id: formData.serial_id.trim() || undefined,
+        unique_id: formData.unique_id.trim() || undefined,
         pattern: formData.pattern.trim(),
+        separator: formData.separator.trim() || undefined,
         type: formData.type.trim() || undefined,
         series_years: formData.series_years.trim() || undefined,
       };
@@ -89,7 +139,11 @@ const AddPattern = () => {
               // Reset form
               setFormData({
                 plate_id: 0,
+                external_id: '',
+                serial_id: '',
+                unique_id: '',
                 pattern: '',
+                separator: '',
                 type: '',
                 series_years: '',
               });
@@ -133,17 +187,40 @@ const AddPattern = () => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardView}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.headerCard}>
         <Text style={styles.title}>Add New Pattern</Text>
+        {selectedPlate && (
+          <Text style={styles.subTitle}>
+            for {selectedPlate.name} ({selectedPlate.state})
+          </Text>
+        )}
       </View>
 
-      <View style={styles.form}>
+      <View style={styles.card}>
         {/* Plate Selection */}
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>License Plate *</Text>
           {platesLoading ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color="#007bff" />
+          ) : preselectedPlateId ? (
+            <View style={[styles.input, styles.readOnlyInput]}>
+              <Text style={styles.readOnlyText}>
+                {selectedPlate 
+                  ? `${selectedPlate.name} (${selectedPlate.state})` 
+                  : 'Loading plate...'
+                }
+              </Text>
+            </View>
           ) : (
             <View style={styles.dropdown}>
               <TouchableOpacity
@@ -167,14 +244,62 @@ const AddPattern = () => {
           )}
         </View>
 
+        {/* Auto-generated fields info */}
+        {autoGenerating && (
+          <View style={styles.infoContainer}>
+            <ActivityIndicator size="small" color="#007bff" />
+            <Text style={styles.infoText}>Auto-generating IDs...</Text>
+          </View>
+        )}
+
+        {formData.plate_id > 0 && (
+          <>
+            {/* External ID - Auto-generated, read-only */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>External ID (Auto-generated)</Text>
+              <View style={[styles.input, styles.readOnlyInput]}>
+                <Text style={styles.readOnlyText}>{formData.external_id || 'Generating...'}</Text>
+              </View>
+            </View>
+
+            {/* Serial ID - Auto-generated, read-only */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Serial ID (Auto-generated)</Text>
+              <View style={[styles.input, styles.readOnlyInput]}>
+                <Text style={styles.readOnlyText}>{formData.serial_id || 'Generating...'}</Text>
+              </View>
+            </View>
+
+            {/* Unique ID - Auto-generated, read-only */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Unique ID (Auto-generated)</Text>
+              <View style={[styles.input, styles.readOnlyInput]}>
+                <Text style={styles.readOnlyText}>{formData.unique_id || 'Generating...'}</Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {/* Number Pattern */}
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Number Pattern *</Text>
+          <Text style={styles.label}>Pattern *</Text>
           <TextInput
             style={styles.input}
             value={formData.pattern}
             onChangeText={(text) => handleInputChange('pattern', text)}
-            placeholder="e.g., ABC-1234, 123-4567"
+            placeholder="e.g., #aaa###, ######a#"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        {/* Separator */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Separator</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.separator}
+            onChangeText={(text) => handleInputChange('separator', text)}
+            placeholder="e.g., -, (space), or leave empty"
             placeholderTextColor="#999"
           />
         </View>
@@ -186,19 +311,19 @@ const AddPattern = () => {
             style={styles.input}
             value={formData.type}
             onChangeText={(text) => handleInputChange('type', text)}
-            placeholder="e.g., Standard, Special, Custom"
+            placeholder="e.g., Passenger, Truck, Trailer"
             placeholderTextColor="#999"
           />
         </View>
 
         {/* Series Years */}
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Series Years</Text>
+          <Text style={styles.label}>Years</Text>
           <TextInput
             style={styles.input}
             value={formData.series_years}
             onChangeText={(text) => handleInputChange('series_years', text)}
-            placeholder="e.g., 2020-2023, 1995-2000"
+            placeholder="e.g., 2011-present, 1998-2000"
             placeholderTextColor="#999"
           />
         </View>
@@ -210,7 +335,7 @@ const AddPattern = () => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
           ) : (
             <Text style={styles.submitButtonText}>Add Pattern</Text>
           )}
@@ -256,31 +381,49 @@ const AddPattern = () => {
           />
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
-  header: {
-    backgroundColor: '#007AFF',
-    padding: 20,
-    paddingTop: 50,
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  headerCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    margin: 10,
+    borderRadius: 10,
+    elevation: 2,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
   },
-  form: {
-    padding: 20,
+  subTitle: {
+    fontSize: 16,
+    color: '#666',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    margin: 10,
+    borderRadius: 10,
+    elevation: 2,
   },
   fieldContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
@@ -319,15 +462,37 @@ const styles = StyleSheet.create({
   dropdownTextPlaceholder: {
     color: '#999',
   },
+  readOnlyInput: {
+    backgroundColor: '#f0f0f0',
+    borderColor: '#ccc',
+  },
+  readOnlyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f3ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  infoText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#007bff',
+  },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#28a745',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
   },
   submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#6c757d',
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
@@ -337,7 +502,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -345,33 +510,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 50,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    elevation: 2,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
   },
   closeButton: {
     padding: 8,
   },
   closeButtonText: {
-    color: '#007AFF',
+    color: '#007bff',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   searchContainer: {
-    padding: 20,
+    padding: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    marginTop: 10,
+    marginHorizontal: 10,
+    borderRadius: 10,
+    elevation: 2,
   },
   searchInput: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -379,14 +547,17 @@ const styles = StyleSheet.create({
   },
   platesList: {
     flex: 1,
+    margin: 10,
   },
   plateItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#fff',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginBottom: 8,
+    borderRadius: 8,
+    elevation: 1,
   },
   plateName: {
     fontSize: 16,

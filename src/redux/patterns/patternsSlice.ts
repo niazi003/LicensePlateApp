@@ -15,10 +15,15 @@ export const updatePatternThunk = createAsyncThunk('patterns/update', async (pat
   return pattern;
 });
 
-export const deletePatternThunk = createAsyncThunk('patterns/delete', async (pattern_id: number) => {
-  await db.deletePattern(pattern_id);
-  return pattern_id;
-});
+export const deletePatternThunk = createAsyncThunk(
+  'patterns/delete', 
+  async (args: { pattern_id: number; plate_id: number }) => {
+    await db.deletePattern(args.pattern_id);
+    // Renumber remaining patterns for this plate
+    await db.renumberPatternsForPlate(args.plate_id);
+    return args;
+  }
+);
 
 type PatternsState = {
   byId: Record<number, Pattern>;
@@ -50,9 +55,9 @@ const patternsSlice = createSlice({
       .addCase(updatePatternThunk.fulfilled, (state, action: PayloadAction<Pattern>) => {
         state.byId[action.payload.pattern_id!] = action.payload;
       })
-      .addCase(deletePatternThunk.fulfilled, (state, action: PayloadAction<number>) => {
-        delete state.byId[action.payload];
-        state.allIds = state.allIds.filter(id => id !== action.payload);
+      .addCase(deletePatternThunk.fulfilled, (state, action: PayloadAction<{ pattern_id: number; plate_id: number }>) => {
+        delete state.byId[action.payload.pattern_id];
+        state.allIds = state.allIds.filter(id => id !== action.payload.pattern_id);
       });
   },
 });
