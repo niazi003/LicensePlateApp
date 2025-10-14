@@ -42,6 +42,7 @@ export interface Pattern {
 export interface Sighting {
   sighting_id?: number;
   plate_id: number;
+  pattern_id?: number | null;
   external_id?: string;
   location?: string;
   time?: string;
@@ -100,10 +101,9 @@ export interface PlateFilters {
   pattern_color?: string;  // Number color
   state_color?: string;
   // Pattern filters
-  pattern_text?: string;  // Search pattern text (e.g., #aaa###)
+  pattern_text?: string;  // Search pattern text (exact match by default, use * for partial: *[T/R]*)
   pattern_type?: string;  // Search pattern type (e.g., Passenger, Truck)
   pattern_separator?: string;  // Search pattern separator
-  pattern_years?: string;  // Search pattern years
 }
 
 export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate[]> => {
@@ -217,13 +217,25 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
 
   // Pattern filters - join with SerialPattern table
   if (filters.pattern_text?.trim() || filters.pattern_type?.trim() || 
-      filters.pattern_separator?.trim() || filters.pattern_years?.trim()) {
+      filters.pattern_separator?.trim()) {
     // Add pattern filter conditions
     const patternConditions: string[] = [];
     
     if (filters.pattern_text?.trim()) {
-      patternConditions.push('LOWER(sp.pattern) LIKE LOWER(?)');
-      params.push(`%${filters.pattern_text.trim()}%`);
+      const patternText = filters.pattern_text.trim();
+      // Check if wildcards are used (starts or ends with *)
+      const hasWildcards = patternText.startsWith('*') || patternText.endsWith('*');
+      
+      if (hasWildcards) {
+        // Partial search with wildcards - convert * to SQL %
+        const sqlPattern = patternText.replace(/\*/g, '%');
+        patternConditions.push('LOWER(sp.pattern) LIKE LOWER(?)');
+        params.push(sqlPattern);
+      } else {
+        // Exact match by default
+        patternConditions.push('LOWER(sp.pattern) = LOWER(?)');
+        params.push(patternText);
+      }
     }
     if (filters.pattern_type?.trim()) {
       patternConditions.push('LOWER(sp.type) LIKE LOWER(?)');
@@ -232,10 +244,6 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     if (filters.pattern_separator?.trim()) {
       patternConditions.push('LOWER(sp.separator) LIKE LOWER(?)');
       params.push(`%${filters.pattern_separator.trim()}%`);
-    }
-    if (filters.pattern_years?.trim()) {
-      patternConditions.push('sp.series_years LIKE ?');
-      params.push(`%${filters.pattern_years.trim()}%`);
     }
     
     if (patternConditions.length > 0) {
@@ -544,9 +552,10 @@ export const getSightingsByPlate = async (plate_id: number): Promise<Sighting[]>
 
 export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
   const res = await executeSql(
-    `INSERT INTO Sighting (plate_id, external_id, location, time, notes, image_uri, trip, latitude, longitude, city, state, country, full_address) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);`,
+    `INSERT INTO Sighting (plate_id, pattern_id, external_id, location, time, notes, image_uri, trip, latitude, longitude, city, state, country, full_address) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
     [
       sighting.plate_id,
+      sighting.pattern_id ?? null,
       sighting.external_id,
       sighting.location,
       sighting.time,
@@ -566,9 +575,10 @@ export const addSighting = async (sighting: Sighting): Promise<Sighting> => {
 
 export const updateSighting = async (sighting: Sighting): Promise<void> => {
   await executeSql(
-    `UPDATE Sighting SET plate_id=?, external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=?, city=?, state=?, country=?, full_address=? WHERE sighting_id=?;`,
+    `UPDATE Sighting SET plate_id=?, pattern_id=?, external_id=?, location=?, time=?, notes=?, image_uri=?, trip=?, latitude=?, longitude=?, city=?, state=?, country=?, full_address=? WHERE sighting_id=?;`,
     [
       sighting.plate_id,
+      sighting.pattern_id ?? null,
       sighting.external_id,
       sighting.location,
       sighting.time,

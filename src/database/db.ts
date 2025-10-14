@@ -84,6 +84,7 @@ export const initDB = async (): Promise<void> => {
     CREATE TABLE IF NOT EXISTS Sighting (
       sighting_id INTEGER PRIMARY KEY AUTOINCREMENT,
       plate_id INTEGER NOT NULL,
+      pattern_id INTEGER,
       external_id TEXT,
       location TEXT,
       time TEXT,
@@ -92,7 +93,8 @@ export const initDB = async (): Promise<void> => {
       trip TEXT,
       latitude REAL,
       longitude REAL,
-      FOREIGN KEY ( plate_id ) REFERENCES LicensePlate( plate_id ) ON DELETE CASCADE
+      FOREIGN KEY ( plate_id ) REFERENCES LicensePlate( plate_id ) ON DELETE CASCADE,
+      FOREIGN KEY ( pattern_id ) REFERENCES SerialPattern( pattern_id ) ON DELETE SET NULL
     );
   `);
 

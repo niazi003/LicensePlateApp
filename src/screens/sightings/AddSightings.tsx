@@ -40,6 +40,9 @@ const AddSightings = () => {
   const [allPlates, setAllPlates] = useState<db.Plate[]>([]);
   const [plateItems, setPlateItems] = useState<any[]>([]);
   const plate = useSelector((s: RootState) => (plateId ? s.plates.byId[plateId] : undefined));
+  const [patternId, setPatternId] = useState<number | undefined>(undefined);
+  const [patterns, setPatterns] = useState<db.Pattern[]>([]);
+  const [patternItems, setPatternItems] = useState<any[]>([]);
   const [time, setTime] = useState<string>(() => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -161,15 +164,6 @@ const AddSightings = () => {
     }
   }, [latitude, longitude, dispatch]);
 
-
-  // Automatically perform reverse geocoding when coordinates are available
-  useEffect(() => {
-    if (latitude && longitude && !city && !state && !country) {
-      console.log('Auto-triggering reverse geocoding for coordinates:', { latitude, longitude });
-      performReverseGeocoding();
-    }
-  }, [latitude, longitude, city, state, country, performReverseGeocoding]);
-
   const requestLocationPermission = async () => {
     try {
       const granted = await PermissionsAndroid.request(
@@ -195,12 +189,6 @@ const AddSightings = () => {
             setAccuracy(position.coords.accuracy);
             setGettingLocation(false);
             setLocationError(false);
-            
-            // Automatically perform reverse geocoding when we get coordinates
-            console.log('GPS coordinates obtained, will auto-geocode:', { 
-              latitude: position.coords.latitude, 
-              longitude: position.coords.longitude 
-            });
           },
           (error) => {
             console.error('Error getting location:', error);
@@ -246,12 +234,6 @@ const AddSightings = () => {
         setAccuracy(position.coords.accuracy);
         setGettingLocation(false);
         setLocationError(false);
-        
-        // Automatically perform reverse geocoding when we get coordinates
-        console.log('GPS coordinates obtained, will auto-geocode:', { 
-          latitude: position.coords.latitude, 
-          longitude: position.coords.longitude 
-        });
       },
       (error) => {
         console.error('Error getting location:', error);
@@ -284,6 +266,30 @@ const AddSightings = () => {
       }
     })();
   }, [prefillPlateId]);
+
+  // Load patterns when plate is selected
+  useEffect(() => {
+    (async () => {
+      if (plateId) {
+        try {
+          const loadedPatterns = await db.getPatternsByPlate(plateId);
+          setPatterns(loadedPatterns);
+          setPatternItems(loadedPatterns.map(pattern => ({
+            label: `${pattern.pattern}${pattern.type ? ` (${pattern.type})` : ''}`,
+            value: pattern.pattern_id,
+          })));
+          // Clear pattern selection when plate changes
+          setPatternId(undefined);
+        } catch (error) {
+          console.error('Error loading patterns:', error);
+        }
+      } else {
+        setPatterns([]);
+        setPatternItems([]);
+        setPatternId(undefined);
+      }
+    })();
+  }, [plateId]);
 
 
   const canSave = useMemo(() => {
@@ -368,6 +374,7 @@ const AddSightings = () => {
       await dispatch(
         createSighting({
           plate_id: plateId!,
+          pattern_id: patternId || null,
           location,
           time,
           notes,
@@ -440,6 +447,34 @@ const AddSightings = () => {
           </Text>
           <Text style={styles.selectedPlateId}>ID: {plate.external_id}</Text>
         </View>
+      )}
+
+      {/* Pattern selection */}
+      {plateId && patternItems.length > 0 && (
+        <>
+          <Text style={styles.label}>Pattern (Optional)</Text>
+          <Dropdown
+            data={patternItems}
+            value={patternId}
+            onChange={(item) => setPatternId(item.value)}
+            labelField="label"
+            valueField="value"
+            placeholder="Select a pattern (optional)"
+            search
+            searchPlaceholder="Search patterns..."
+            style={styles.dropdown}
+            placeholderStyle={styles.placeholderStyle}
+            selectedTextStyle={styles.selectedTextStyle}
+            inputSearchStyle={styles.inputSearchStyle}
+            iconStyle={styles.iconStyle}
+            containerStyle={styles.dropdownContainer}
+            itemContainerStyle={styles.listItemContainer}
+            itemTextStyle={styles.listItemText}
+            renderRightIcon={() => (
+              <Text style={styles.dropdownIcon}>▼</Text>
+            )}
+          />
+        </>
       )}
 
       {/* Time & location */}

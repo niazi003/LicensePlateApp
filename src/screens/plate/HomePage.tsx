@@ -43,7 +43,6 @@ const HomePage = () => {
         pattern_text: '',
         pattern_type: '',
         pattern_separator: '',
-        pattern_years: '',
     });
     const [results, setResults] = useState<Plate[]>([]);
     const [searching, setSearching] = useState(false);
@@ -86,7 +85,6 @@ const HomePage = () => {
             filters.pattern_text?.trim() ||
             filters.pattern_type?.trim() ||
             filters.pattern_separator?.trim() ||
-            filters.pattern_years?.trim() ||
             (filters.available !== 'all') ||
             (filters.base !== 'all') ||
             (filters.embossed !== 'all') ||
@@ -121,7 +119,6 @@ const HomePage = () => {
                     searchFilters.pattern_text?.trim() ||
                     searchFilters.pattern_type?.trim() ||
                     searchFilters.pattern_separator?.trim() ||
-                    searchFilters.pattern_years?.trim() ||
                     (searchFilters.available !== 'all') ||
                     (searchFilters.base !== 'all') ||
                     (searchFilters.embossed !== 'all') ||
@@ -184,6 +181,9 @@ const HomePage = () => {
             state_font: '',
             pattern_color: '',
             state_color: '',
+            pattern_text: '',
+            pattern_type: '',
+            pattern_separator: '',
         };
         setFilters(emptyFilters);
         setUniversalSearch('');
@@ -612,13 +612,13 @@ const HomePage = () => {
                         <View style={styles.filterSection}>
                             <Text style={styles.sectionTitle}>🔢 Pattern Filters</Text>
                             <Text style={styles.sectionSubtitle}>
-                                Find plates by their number patterns
+                                Exact match by default. Use * for partial: *[T/R]*
                             </Text>
                             
                             <Text style={styles.filterLabel}>Pattern Text</Text>
                             <ClearableTextInput
                                 style={styles.filterInput}
-                                placeholder="e.g., #aaa###, ABC123"
+                                placeholder="e.g., #aaa### or *[T/R]*"
                                 placeholderTextColor="gray"
                                 value={filters.pattern_text || ''}
                                 onChangeText={(val) => handleFilterChange('pattern_text', val)}
@@ -652,17 +652,6 @@ const HomePage = () => {
                                     />
                                 </View>
                             </View>
-
-                            <Text style={styles.filterLabel}>Pattern Years</Text>
-                            <ClearableTextInput
-                                style={styles.filterInput}
-                                placeholder="e.g., 2011-present, 1998-2000"
-                                placeholderTextColor="gray"
-                                value={filters.pattern_years || ''}
-                                onChangeText={(val) => handleFilterChange('pattern_years', val)}
-                                autoCapitalize='none'
-                                autoCorrect={false}
-                            />
                         </View>
 
                         {searching && (

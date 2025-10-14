@@ -57,6 +57,11 @@ const UpdateSightings = () => {
   const [_allPlates, setAllPlates] = useState<any[]>([]);
   const [plateItems, setPlateItems] = useState<any[]>([]);
   
+  // Pattern selection state
+  const [selectedPatternId, setSelectedPatternId] = useState<number | null>(null);
+  const [patterns, setPatterns] = useState<db.Pattern[]>([]);
+  const [patternItems, setPatternItems] = useState<any[]>([]);
+  
   // Geocoding state
   const [latitude, setLatitude] = useState<number | null>(sighting?.latitude || null);
   const [longitude, setLongitude] = useState<number | null>(sighting?.longitude || null);
@@ -107,6 +112,27 @@ const UpdateSightings = () => {
     })();
   }, []);
 
+  // Load patterns when plate is selected
+  useEffect(() => {
+    (async () => {
+      if (selectedPlateId) {
+        try {
+          const loadedPatterns = await db.getPatternsByPlate(selectedPlateId);
+          setPatterns(loadedPatterns);
+          setPatternItems(loadedPatterns.map(pattern => ({
+            label: `${pattern.pattern}${pattern.type ? ` (${pattern.type})` : ''}`,
+            value: pattern.pattern_id,
+          })));
+        } catch (error) {
+          console.error('Error loading patterns:', error);
+        }
+      } else {
+        setPatterns([]);
+        setPatternItems([]);
+      }
+    })();
+  }, [selectedPlateId]);
+
   // Initialize form with sighting data
   useEffect(() => {
     if (sighting) {
@@ -127,6 +153,7 @@ const UpdateSightings = () => {
       setCountry(sighting.country || '');
       setFullAddress(sighting.full_address || '');
       setSelectedPlateId(sighting.plate_id || null);
+      setSelectedPatternId(sighting.pattern_id || null);
     }
   }, [sighting]);
 
@@ -280,6 +307,7 @@ const UpdateSightings = () => {
         updateSightingThunk({
           sighting_id: sightingId,
           plate_id: selectedPlateId!,
+          pattern_id: selectedPatternId || null,
           location,
           time,
           notes,
@@ -332,6 +360,8 @@ const UpdateSightings = () => {
           value={selectedPlateId}
           onChange={(item) => {
             setSelectedPlateId(item.value);
+            // Clear pattern when plate changes
+            setSelectedPatternId(null);
           }}
           labelField="label"
           valueField="value"
@@ -358,6 +388,41 @@ const UpdateSightings = () => {
           )}
         />
       </View>
+
+      {/* Pattern selection */}
+      {selectedPlateId && patternItems.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.label}>Pattern (Optional)</Text>
+          <Dropdown
+            data={patternItems}
+            value={selectedPatternId}
+            onChange={(item) => setSelectedPatternId(item.value)}
+            labelField="label"
+            valueField="value"
+            placeholder="Select a pattern (optional)"
+            search
+            searchPlaceholder="Search patterns..."
+            style={styles.dropdown}
+            placeholderStyle={styles.placeholderStyle}
+            selectedTextStyle={styles.selectedTextStyle}
+            inputSearchStyle={styles.inputSearchStyle}
+            iconStyle={styles.iconStyle}
+            containerStyle={styles.dropdownContainer}
+            itemContainerStyle={styles.listItemContainer}
+            itemTextStyle={styles.listItemText}
+            renderRightIcon={() => (
+              <Text style={styles.dropdownIcon}>▼</Text>
+            )}
+            renderItem={(item) => (
+              <View style={styles.listItemContainer}>
+                <Text style={styles.listItemText}>
+                  {item.label}
+                </Text>
+              </View>
+            )}
+          />
+        </View>
+      )}
 
       {/* Location */}
       <View style={styles.section}>
