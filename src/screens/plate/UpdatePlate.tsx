@@ -159,10 +159,14 @@ const UpdatePlate = ({ route }: Props) => {
       >
         <Text style={styles.title}>Update Plate</Text>
 
-      <TextInput style={styles.input} placeholder="State" value={stateVal} onChangeText={setStateVal} />
-      <TextInput style={styles.input} placeholder="Country" value={country} onChangeText={setCountry} />
-      <TextInput style={styles.input} placeholder="Name *" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Years Available" value={yearsAvailable} onChangeText={setYearsAvailable} />
+      <Text style={styles.fieldLabel}>State</Text>
+      <TextInput style={styles.input} value={stateVal} onChangeText={setStateVal} />
+      <Text style={styles.fieldLabel}>Country</Text>
+      <TextInput style={styles.input} value={country} onChangeText={setCountry} />
+      <Text style={styles.fieldLabel}>Home</Text>
+      <TextInput style={styles.input} value={name} onChangeText={setName} />
+      <Text style={styles.fieldLabel}>Years</Text>
+      <TextInput style={styles.input} value={yearsAvailable} onChangeText={setYearsAvailable} />
 
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Available</Text>
@@ -177,70 +181,69 @@ const UpdatePlate = ({ route }: Props) => {
         <Switch value={embossed} onValueChange={setEmbossed} />
       </View>
       <View style={styles.rowBetween}>
-        <Text style={styles.label}>County-specific</Text>
+        <Text style={styles.label}>Has County</Text>
         <Switch value={county} onValueChange={setCounty} />
       </View>
       <View style={styles.rowBetween}>
-        <Text style={styles.label}>URL Flag</Text>
+        <Text style={styles.label}>Has URL</Text>
         <Switch value={url} onValueChange={setUrl} />
       </View>
 
+      <Text style={styles.fieldLabel}>Primary Background Colors</Text>
       <TouchableOpacity style={styles.select} onPress={() => setPrimaryBackgroundColorDropdownOpen(true)}>
         <Text style={styles.selectText}>{primaryBackgroundColors || 'Select Primary Background Color'}</Text>
       </TouchableOpacity>
+      <Text style={styles.fieldLabel}>All Colors</Text>
       <TouchableOpacity style={styles.select} onPress={() => setColorsOpen(true)}>
         <Text style={styles.selectText}>{selectedColors.length ? selectedColors.join(', ') : (allColors || 'Select Colors (multi)')}</Text>
       </TouchableOpacity>
 
+      <Text style={styles.fieldLabel}>Pattern Font</Text>
       <TouchableOpacity style={styles.select} onPress={() => setNumFontDropdownOpen(true)}>
-        <Text style={styles.selectText}>{numFont || 'Select Number Font'}</Text>
+        <Text style={styles.selectText}>{numFont || 'Select Pattern Font'}</Text>
       </TouchableOpacity>
+      <Text style={styles.fieldLabel}>Pattern Color</Text>
+      <TouchableOpacity style={styles.select} onPress={() => setNumColorDropdownOpen(true)}>
+        <Text style={styles.selectText}>{numColor || 'Select Pattern Color'}</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.fieldLabel}>State Font</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateFontDropdownOpen(true)}>
         <Text style={styles.selectText}>{stateFont || 'Select State Font'}</Text>
       </TouchableOpacity>
-      
-      <TouchableOpacity style={styles.select} onPress={() => setNumColorDropdownOpen(true)}>
-        <Text style={styles.selectText}>{numColor || 'Select Number Color'}</Text>
-      </TouchableOpacity>
+      <Text style={styles.fieldLabel}>State Color</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateColorDropdownOpen(true)}>
         <Text style={styles.selectText}>{stateColor || 'Select State Color'}</Text>
       </TouchableOpacity>
-
+      <Text style={styles.fieldLabel}>State Location</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateLocationDropdownOpen(true)}>
         <Text style={styles.selectText}>{stateLocation || 'Select State Location'}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.expandHeader} onPress={() => setShowBackground(s => !s)}>
-        <Text style={styles.sectionTitle}>Background {showBackground ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-      {showBackground && (
-        <TextInput 
-          style={[styles.input, {height: 150, textAlignVertical: 'top'}]} 
-          multiline 
-          placeholder="Background Description" 
-          value={backgroundDesc} 
-          onChangeText={setBackgroundDesc}
-          numberOfLines={6}
-        />
-      )}
+      <Text style={styles.fieldLabel}>Background</Text>
+      <TextInput
+        style={[styles.input, {height: 150, textAlignVertical: 'top'}]}
+        multiline
+        value={backgroundDesc}
+        onChangeText={setBackgroundDesc}
+        numberOfLines={6}
+      />
 
-      <TextInput style={styles.input} placeholder="Plate Text" value={text} onChangeText={setText} />
-      <TextInput style={styles.input} placeholder="Features Tags (additional)" value={featuresTags} onChangeText={setFeaturesTags} />
-      <TextInput style={styles.input} placeholder="Description" value={description} onChangeText={setDescription} />
+      <Text style={styles.fieldLabel}>Plate Text</Text>
+      <TextInput style={styles.input} value={text} onChangeText={setText} />
+      <Text style={styles.fieldLabel}>Tags</Text>
+      <TextInput style={styles.input} value={featuresTags} onChangeText={setFeaturesTags} />
+      <Text style={styles.fieldLabel}>Additional Description</Text>
+      <TextInput style={styles.input} value={description} onChangeText={setDescription} />
 
-      <TouchableOpacity style={styles.expandHeader} onPress={() => setShowNotes(s => !s)}>
-        <Text style={styles.sectionTitle}>Notes {showNotes ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-      {showNotes && (
-        <TextInput 
-          style={[styles.input, {height: 150, textAlignVertical: 'top'}]} 
-          multiline 
-          placeholder="Notes" 
-          value={notes} 
-          onChangeText={setNotes}
-          numberOfLines={6}
-        />
-      )}
+      <Text style={styles.fieldLabel}>Notes</Text>
+      <TextInput
+        style={[styles.input, {height: 150, textAlignVertical: 'top'}]}
+        multiline
+        value={notes}
+        onChangeText={setNotes}
+        numberOfLines={6}
+      />
 
       <TouchableOpacity style={styles.button} onPress={handleUpdate}>
         <Text style={styles.buttonText}>Update Plate</Text>
@@ -399,6 +402,7 @@ const styles = StyleSheet.create({
   },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   label: { fontSize: 16, fontWeight: '500' },
+  fieldLabel: { fontSize: 16, fontWeight: '500', marginBottom: 6, color: '#333' },
   select: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12 },
   selectText: { color: '#333' },
   pillGroup: { flexDirection: 'row' },

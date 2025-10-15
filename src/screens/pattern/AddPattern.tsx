@@ -19,7 +19,7 @@ import { AppDispatch, RootState } from '../../redux/store';
 import { createPattern } from '../../redux/patterns/patternsSlice';
 import { fetchPlates } from '../../redux/plates/platesSlice';
 import { selectAllPlatesArray, selectPlatesLoading } from '../../redux/plates/platesSelectors';
-import { Pattern, getNextSerialId, generateUniqueId } from '../../database/helpers';
+import { Pattern, getNextSerialId, generateUniqueIdSafe } from '../../database/helpers';
 
 interface Plate {
   plate_id?: number;
@@ -73,7 +73,7 @@ const AddPattern = () => {
           if (!selectedPlate) return;
 
           const nextSerialId = await getNextSerialId(formData.plate_id);
-          const uniqueId = await generateUniqueId(formData.plate_id, nextSerialId);
+          const uniqueId = await generateUniqueIdSafe(formData.plate_id, nextSerialId);
           
           setFormData(prev => ({
             ...prev,

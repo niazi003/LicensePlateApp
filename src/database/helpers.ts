@@ -223,19 +223,30 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     
     if (filters.pattern_text?.trim()) {
       const patternText = filters.pattern_text.trim();
-      // Check if wildcards are used (starts or ends with *)
-      const hasWildcards = patternText.startsWith('*') || patternText.endsWith('*');
-      
-      if (hasWildcards) {
-        // Partial search with wildcards - convert * to SQL %
-        const sqlPattern = patternText.replace(/\*/g, '%');
-        patternConditions.push('LOWER(sp.pattern) LIKE LOWER(?)');
-        params.push(sqlPattern);
-      } else {
-        // Exact match by default
-        patternConditions.push('LOWER(sp.pattern) = LOWER(?)');
-        params.push(patternText);
+
+      let sqlPattern = patternText;
+      const isActual = (patternText.indexOf('a') === -1) &&
+                       (patternText.indexOf('#') === -1) &&
+                       (patternText.indexOf('?') === -1);
+
+      if (isActual) {
+        sqlPattern = sqlPattern.replace(/[A-Z]/g,'a').replace(/[0-9]/g, '#');
       }
+
+      var replaceMap : { [key: string]: any } = {
+        '[':'\\[',
+        ']':'\\]',
+        '*':'.*',
+        '?':'[A-Za0-9#?]',
+        a:'[A-Za?]',
+        '#':'[0-9#?]',
+      };
+
+      sqlPattern = '^' + sqlPattern.replace(/\[|\]|\*|\?|a|#/g, function(matched) {
+        return replaceMap[matched];
+      }) + '$';
+      patternConditions.push('LOWER(sp.pattern) REGEXP LOWER(?)');
+      params.push(sqlPattern);
     }
     if (filters.pattern_type?.trim()) {
       patternConditions.push('LOWER(sp.type) LIKE LOWER(?)');
@@ -290,7 +301,7 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
 export const testDatabase = async (): Promise<boolean> => {
   try {
     console.log('Testing database connection...');
-    const result = await executeSql('SELECT 1 as test;');
+    await executeSql('SELECT 1 as test;');
     console.log('Database connection test successful');
     return true;
   } catch (error) {
@@ -465,11 +476,27 @@ export const getPatternsByPlate = async (plate_id: number): Promise<Pattern[]> =
 };
 
 export const addPattern = async (pattern: Pattern): Promise<Pattern> => {
-  const res = await executeSql(
-    `INSERT INTO SerialPattern (plate_id, external_id, serial_id, unique_id, pattern, separator, type, series_years) VALUES (?,?,?,?,?,?,?,?);`,
-    [pattern.plate_id, pattern.external_id, pattern.serial_id, pattern.unique_id, pattern.pattern, pattern.separator, pattern.type, pattern.series_years],
-  );
-  return { ...pattern, pattern_id: res.insertId };
+  try {
+    // If unique_id is not provided, generate it safely
+    let uniqueId = pattern.unique_id;
+    if (!uniqueId && pattern.plate_id && pattern.serial_id) {
+      uniqueId = await generateUniqueIdSafe(pattern.plate_id, pattern.serial_id);
+    }
+
+    const res = await executeSql(
+      `INSERT INTO SerialPattern (plate_id, external_id, serial_id, unique_id, pattern, separator, type, series_years) VALUES (?,?,?,?,?,?,?,?);`,
+      [pattern.plate_id, pattern.external_id, pattern.serial_id, uniqueId, pattern.pattern, pattern.separator, pattern.type, pattern.series_years],
+    );
+    return { ...pattern, pattern_id: res.insertId, unique_id: uniqueId };
+  } catch (error: any) {
+    // Check if it's a unique constraint violation
+    if (error.message && error.message.includes('UNIQUE constraint failed')) {
+      console.error('Unique constraint violation when adding pattern:', error.message);
+      throw new Error(`Pattern with this unique ID already exists. Please try again or contact support if the issue persists.`);
+    }
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 export const updatePattern = async (pattern: Pattern): Promise<void> => {
@@ -486,11 +513,12 @@ export const deletePattern = async (pattern_id: number): Promise<void> => {
 // Helper function to get next serial_id for a plate
 export const getNextSerialId = async (plate_id: number): Promise<string> => {
   const res = await executeSql(
-    'SELECT COUNT(*) as count FROM SerialPattern WHERE plate_id = ?;',
+    'SELECT MAX(CAST(serial_id AS INTEGER)) as max_serial FROM SerialPattern WHERE plate_id = ?;',
     [plate_id]
   );
-  const count = res.rows.item(0).count as number;
-  return (count + 1).toString();
+  const maxSerial = res.rows.item(0).max_serial;
+  // If no patterns exist, maxSerial will be null, so start with 1
+  return maxSerial ? (maxSerial + 1).toString() : '1';
 };
 
 // Helper function to generate unique_id from plate's external_id and serial_id
@@ -504,6 +532,40 @@ export const generateUniqueId = async (plate_id: number, serial_id: string): Pro
   }
   const external_id = plateRes.rows.item(0).external_id as string;
   return `${external_id}-${serial_id}`;
+};
+
+// Helper function to generate a unique_id that doesn't conflict with existing ones
+export const generateUniqueIdSafe = async (plate_id: number, serial_id: string): Promise<string> => {
+  const baseUniqueId = await generateUniqueId(plate_id, serial_id);
+  
+  // Check if this unique_id already exists
+  const existingRes = await executeSql(
+    'SELECT 1 FROM SerialPattern WHERE unique_id = ? LIMIT 1;',
+    [baseUniqueId]
+  );
+  
+  if (existingRes.rows.length === 0) {
+    // No conflict, return the base unique_id
+    return baseUniqueId;
+  }
+  
+  // Conflict exists, try with timestamp suffix
+  const timestamp = Date.now();
+  const uniqueIdWithTimestamp = `${baseUniqueId}-${timestamp}`;
+  
+  // Check if this one also exists (very unlikely but safe)
+  const conflictRes = await executeSql(
+    'SELECT 1 FROM SerialPattern WHERE unique_id = ? LIMIT 1;',
+    [uniqueIdWithTimestamp]
+  );
+  
+  if (conflictRes.rows.length === 0) {
+    return uniqueIdWithTimestamp;
+  }
+  
+  // Extremely unlikely case - use random suffix
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  return `${baseUniqueId}-${randomSuffix}`;
 };
 
 // Renumber all patterns for a plate (recalculate serial_id and unique_id)

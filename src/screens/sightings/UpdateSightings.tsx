@@ -392,7 +392,18 @@ const UpdateSightings = () => {
       {/* Pattern selection */}
       {selectedPlateId && patternItems.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.label}>Pattern (Optional)</Text>
+          <View style={styles.patternHeader}>
+            <Text style={styles.label}>Pattern (Optional)</Text>
+            {selectedPatternId && (
+              <TouchableOpacity 
+                style={styles.clearPatternButton}
+                onPress={() => setSelectedPatternId(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.clearPatternText}>✕ Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Dropdown
             data={patternItems}
             value={selectedPatternId}
@@ -429,8 +440,6 @@ const UpdateSightings = () => {
         <Text style={styles.label}>Location *</Text>
         <ClearableTextInput
           style={styles.input}
-          placeholder="Enter location"
-          placeholderTextColor="#999"
           value={location}
           onChangeText={setLocation}
         />
@@ -440,8 +449,6 @@ const UpdateSightings = () => {
           <Text style={styles.coordinatesLabel}>GPS Coordinates</Text>
           <ClearableTextInput
             style={styles.coordinatesInput}
-            placeholder="e.g., 40.7128, -74.0060"
-            placeholderTextColor="#999"
             value={coordinatesString}
             onChangeText={handleCoordinatesChange}
             keyboardType="numeric"
@@ -488,8 +495,6 @@ const UpdateSightings = () => {
         <Text style={styles.label}>Time</Text>
         <ClearableTextInput
           style={styles.input}
-          placeholder="MM-DD-YYYY HH:MM"
-          placeholderTextColor="#999"
           value={time}
           onChangeText={setTime}
         />
@@ -541,8 +546,6 @@ const UpdateSightings = () => {
           <View style={styles.addTripContainer}>
             <ClearableTextInput
               style={styles.input}
-              placeholder="Enter new trip name"
-              placeholderTextColor="gray"
               value={newTripName}
               onChangeText={setNewTripName}
               autoFocus
@@ -591,8 +594,6 @@ const UpdateSightings = () => {
         <Text style={styles.label}>Notes</Text>
         <ClearableTextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Enter notes"
-          placeholderTextColor="#999"
           value={notes}
           onChangeText={setNotes}
           multiline
@@ -685,6 +686,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     color: '#333',
+  },
+  patternHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  clearPatternButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  clearPatternText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   plateInfo: {
     fontSize: 16,

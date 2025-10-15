@@ -32,6 +32,12 @@ const PlateDetail = ({ route }: Props) => {
   const [showDelete, setShowDelete] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
+  // Helper function to format comma-separated lists
+  const formatList = (text: string | undefined | null): string => {
+    if (!text || text.trim() === '') return '-';
+    return text.split(',').map(item => item.trim()).filter(item => item).join(' • ');
+  };
+
   const plate = useSelector((state: RootState) => state.plates.byId[plateId]);
   const patterns = useSelector((state: RootState) =>
     state.patterns.allIds.map(id => state.patterns.byId[id]).filter(p => p.plate_id === plateId),
@@ -98,80 +104,47 @@ const PlateDetail = ({ route }: Props) => {
       {/* Details */}
       <View style={styles.card}>
         <Text style={styles.section}>Details</Text>
+
+        <Text style={styles.detail}>{plate.base ? 'Base Plate' : 'Specialty Plate'}; {plate.embossed ? 'Embossed' : 'Flat'}</Text>
         <Text style={styles.detail}>
-          Years:
-          <Text style={styles.bold}> {plate.years_available || '-'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          Available:
-          <Text style={styles.bold}> {plate.available ? 'Yes' : 'No'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          Base:
-          <Text style={styles.bold}> {plate.base ? 'Yes' : 'No'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          Embossed:
-          <Text style={styles.bold}> {plate.embossed ? 'Yes' : 'No'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          County-specific:
-          <Text style={styles.bold}> {plate.county ? 'Yes' : 'No'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          URL Flag:
-          <Text style={styles.bold}> {plate.url ? 'Yes' : 'No'}</Text>
+          <Text style={styles.bold}>{plate.years_available || '-'} </Text><Text style={ {color:"gray"} }>{plate.available ? '(Still Available)' : '(No Longer Available)'}</Text>
         </Text>
 
         <Text style={styles.detail}>
-          Primary Colors:
-          <Text style={styles.bold}> {plate.primary_background_colors || '-'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          All Colors:
-          <Text style={styles.bold}> {plate.all_colors || '-'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          Background:
-          <Text style={styles.bold}> {plate.background_description || '-'}</Text>
+          State Name: <Text style={styles.bold}>{plate.state_color || 'Unknown Color'}</Text> in <Text style={styles.bold}>{plate.state_font || 'Unknown Font'} ({plate.state_location + ' of Plate' || 'Unknown Location'})</Text>
         </Text>
 
         <Text style={styles.detail}>
-          Plate Text:
-          <Text style={styles.bold}> {plate.text || '-'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          Pattern Font:
-          <Text style={styles.bold}> {plate.pattern_font || '-'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          Pattern Color:
-          <Text style={styles.bold}> {plate.pattern_color || '-'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          State Font:
-          <Text style={styles.bold}> {plate.state_font || '-'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          State Color:
-          <Text style={styles.bold}>{plate.state_color || '-'} </Text>
-        </Text>
-        <Text style={styles.detail}>
-          State Location:
-          <Text style={styles.bold}> {plate.state_location || '-'}</Text>
+          Serial: <Text style={styles.bold}>{plate.pattern_color || 'Unknown Color'}</Text> in <Text style={styles.bold}>{plate.pattern_font || 'Unknown Font'}</Text>
         </Text>
 
+        <Text>Primary Background Colors:</Text>
+        <Text style={[styles.detail, styles.bold]}>{formatList(plate.primary_background_colors)} </Text>
+
+        <Text>All Colors:</Text>
+        <Text style={[styles.detail, styles.bold]}>{formatList(plate.all_colors)} </Text>
+
+        <Text style={styles.detail}>
+          Plate Text: {plate.text || <Text style={ {color: 'gray'} }>None</Text>}
+        </Text>
+
+        <Text style={styles.detail}>{plate.county ? 'Has County Sticker' : 'No County Sticker'}; {plate.url ? 'Has URL' : 'No URL'}</Text>
         <Text style={styles.detail}>
           Tags:
-          <Text style={styles.bold}> {plate.tags || '-'}</Text>
+          <Text style={styles.bold}> {formatList(plate.tags)}</Text>
         </Text>
+
+        <Text>Background Description:</Text>
+        <Text style={[styles.detail, styles.italics]}>{plate.background_description || '-'} </Text>
+
+        <Text>Additional Description:</Text>
+        <Text style={[styles.detail, styles.italics]}>{plate.additional_description || '-'} </Text>
+      </View>
+
+      <View style={styles.card}>
+      <Text style={styles.section}>Notes</Text>
         <Text style={styles.detail}>
-          Additional Description:
-          <Text style={styles.bold}> {plate.additional_description || '-'}</Text>
-        </Text>
-        <Text style={styles.detail}>
-          Notes:
-          <Text style={styles.bold}> {plate.notes || '-'}</Text>
+          <Text> {plate.notes || <Text style={ {color: 'gray'} }>None</Text>}</Text>
         </Text>
       </View>
 
@@ -430,6 +403,7 @@ const styles = StyleSheet.create({
   section: { fontSize: 18, fontWeight: '600', marginBottom: 10 },
   detail: { fontSize: 14, marginBottom: 6, color: '#333' },
   bold: { fontWeight: 'bold' },
+  italics: { fontStyle: 'italic' },
 
   controls: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 10, marginBottom: 20 },
   button: { flex: 1, padding: 12, borderRadius: 8, marginHorizontal: 5, alignItems: 'center' },

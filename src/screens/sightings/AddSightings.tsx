@@ -452,7 +452,18 @@ const AddSightings = () => {
       {/* Pattern selection */}
       {plateId && patternItems.length > 0 && (
         <>
-          <Text style={styles.label}>Pattern (Optional)</Text>
+          <View style={styles.patternHeader}>
+            <Text style={styles.label}>Pattern (Optional)</Text>
+            {patternId && (
+              <TouchableOpacity 
+                style={styles.clearPatternButton}
+                onPress={() => setPatternId(undefined)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.clearPatternText}>✕ Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Dropdown
             data={patternItems}
             value={patternId}
@@ -478,11 +489,11 @@ const AddSightings = () => {
       )}
 
       {/* Time & location */}
-      <ClearableTextInput style={styles.input} placeholder="Time (MM-DD-YYYY HH:MM)" placeholderTextColor={"gray"} value={time} onChangeText={setTime} />
+      <Text style={styles.fieldLabel}>Time (MM-DD-YYYY HH:MM)</Text>
+      <ClearableTextInput style={styles.input} value={time} onChangeText={setTime} />
+      <Text style={styles.fieldLabel}>Location (city, state)</Text>
       <ClearableTextInput
         style={styles.input}
-        placeholder="Location (city, state)"
-        placeholderTextColor={"gray"}
         value={location}
         onChangeText={setLocation}
       />
@@ -569,11 +580,10 @@ const AddSightings = () => {
       )}
 
       {/* Notes */}
+      <Text style={styles.fieldLabel}>Notes (required if no plate)</Text>
       <ClearableTextInput
         style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
         multiline
-        placeholder="Notes (required if no plate)"
-        placeholderTextColor={"gray"}
         value={notes}
         onChangeText={setNotes}
       />
@@ -636,10 +646,9 @@ const AddSightings = () => {
       {/* Add Trip Input */}
       {showAddTrip && (
         <View style={styles.addTripContainer}>
+          <Text style={styles.fieldLabel}>Enter new trip name</Text>
           <ClearableTextInput
             style={styles.input}
-            placeholder="Enter new trip name"
-            placeholderTextColor="gray"
             value={newTripName}
             onChangeText={setNewTripName}
             autoFocus
@@ -720,6 +729,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   label: { fontSize: 16, fontWeight: '500', marginBottom: 8 },
+  fieldLabel: { fontSize: 16, fontWeight: '500', marginBottom: 6, color: '#333' },
+  patternHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  clearPatternButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  clearPatternText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   button: {
     backgroundColor: '#007bff',
     padding: 14,
