@@ -41,13 +41,13 @@ const UpdatePlate = ({ route }: Props) => {
   const [available, setAvailable] = useState(false);
   const [base, setBase] = useState(false);
   const [embossed, setEmbossed] = useState(false);
-  const [primaryBackgroundColors, setPrimaryBackgroundColors] = useState('');
+  const [primaryBackgroundColors, setPrimaryBackgroundColors] = useState<string[]>([]);
   const [allColors, setAllColors] = useState('');
   const [backgroundDesc, setBackgroundDesc] = useState('');
   const [numFont, setNumFont] = useState('');
-  const [numColor, setNumColor] = useState('');
+  const [numColors, setNumColors] = useState<string[]>([]);
   const [stateFont, setStateFont] = useState('');
-  const [stateColor, setStateColor] = useState('');
+  const [stateColors, setStateColors] = useState<string[]>([]);
   const [stateLocation, setStateLocation] = useState<'Top' | 'Bottom' | ''>('');
   const [featuresTags, setFeaturesTags] = useState('');
   const [description, setDescription] = useState('');
@@ -74,6 +74,18 @@ const UpdatePlate = ({ route }: Props) => {
   const toggleColor = (c: string) =>
     setSelectedColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
 
+  const togglePrimaryBackgroundColor = (c: string) => {
+    setPrimaryBackgroundColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
+  const toggleNumColor = (c: string) => {
+    setNumColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
+  const toggleStateColor = (c: string) => {
+    setStateColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
   const composeFeaturesTags = (): string => {
     const metas = [stateLocation ? `state_location=${stateLocation}` : null].filter(Boolean) as string[];
     const baseTags = featuresTags?.trim() ? [featuresTags.trim()] : [];
@@ -89,13 +101,14 @@ const UpdatePlate = ({ route }: Props) => {
       setAvailable(!!plate.available);
       setBase(!!plate.base);
       setEmbossed(!!plate.embossed);
-      setPrimaryBackgroundColors(plate.primary_background_colors || '');
+      // Initialize color arrays from comma-separated strings
+      setPrimaryBackgroundColors(plate.primary_background_colors ? plate.primary_background_colors.split(',').map(s => s.trim()).filter(Boolean) : []);
       setAllColors(plate.all_colors || '');
       setBackgroundDesc(plate.background_description || '');
       setNumFont(plate.pattern_font || '');
-      setNumColor(plate.pattern_color || '');
+      setNumColors(plate.pattern_color ? plate.pattern_color.split(',').map(s => s.trim()).filter(Boolean) : []);
       setStateFont(plate.state_font || '');
-      setStateColor(plate.state_color || '');
+      setStateColors(plate.state_color ? plate.state_color.split(',').map(s => s.trim()).filter(Boolean) : []);
       setStateLocation((plate.state_location as any) || '');
       setFeaturesTags(plate.tags || '');
       setDescription(plate.additional_description || '');
@@ -123,11 +136,11 @@ const UpdatePlate = ({ route }: Props) => {
           base,
           embossed,
           pattern_font: numFont,
-          pattern_color: numColor,
+          pattern_color: numColors.join(','),
           state_font: stateFont,
-          state_color: stateColor,
+          state_color: stateColors.join(','),
           state_location: stateLocation,
-          primary_background_colors: primaryBackgroundColors,
+          primary_background_colors: primaryBackgroundColors.join(','),
           all_colors: selectedColors.length ? selectedColors.join(',') : allColors,
           background_description: backgroundDesc,
           text,
@@ -189,9 +202,9 @@ const UpdatePlate = ({ route }: Props) => {
         <Switch value={url} onValueChange={setUrl} />
       </View>
 
-      <Text style={styles.fieldLabel}>Primary Background Colors</Text>
+      <Text style={styles.fieldLabel}>Primary Background Colors (Multi-Select)</Text>
       <TouchableOpacity style={styles.select} onPress={() => setPrimaryBackgroundColorDropdownOpen(true)}>
-        <Text style={styles.selectText}>{primaryBackgroundColors || 'Select Primary Background Color'}</Text>
+        <Text style={styles.selectText}>{primaryBackgroundColors.length > 0 ? primaryBackgroundColors.join(', ') : 'Select Primary Background Colors'}</Text>
       </TouchableOpacity>
       <Text style={styles.fieldLabel}>All Colors</Text>
       <TouchableOpacity style={styles.select} onPress={() => setColorsOpen(true)}>
@@ -202,18 +215,18 @@ const UpdatePlate = ({ route }: Props) => {
       <TouchableOpacity style={styles.select} onPress={() => setNumFontDropdownOpen(true)}>
         <Text style={styles.selectText}>{numFont || 'Select Pattern Font'}</Text>
       </TouchableOpacity>
-      <Text style={styles.fieldLabel}>Pattern Color</Text>
+      <Text style={styles.fieldLabel}>Pattern Colors (Multi-Select)</Text>
       <TouchableOpacity style={styles.select} onPress={() => setNumColorDropdownOpen(true)}>
-        <Text style={styles.selectText}>{numColor || 'Select Pattern Color'}</Text>
+        <Text style={styles.selectText}>{numColors.length > 0 ? numColors.join(', ') : 'Select Pattern Colors'}</Text>
       </TouchableOpacity>
 
       <Text style={styles.fieldLabel}>State Font</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateFontDropdownOpen(true)}>
         <Text style={styles.selectText}>{stateFont || 'Select State Font'}</Text>
       </TouchableOpacity>
-      <Text style={styles.fieldLabel}>State Color</Text>
+      <Text style={styles.fieldLabel}>State Colors (Multi-Select)</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateColorDropdownOpen(true)}>
-        <Text style={styles.selectText}>{stateColor || 'Select State Color'}</Text>
+        <Text style={styles.selectText}>{stateColors.length > 0 ? stateColors.join(', ') : 'Select State Colors'}</Text>
       </TouchableOpacity>
       <Text style={styles.fieldLabel}>State Location</Text>
       <TouchableOpacity style={styles.select} onPress={() => setStateLocationDropdownOpen(true)}>
@@ -252,18 +265,26 @@ const UpdatePlate = ({ route }: Props) => {
       <Modal visible={colorsOpen} transparent animationType="slide" onRequestClose={() => setColorsOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.title}>Select Colors</Text>
+            <Text style={styles.title}>Select All Colors</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedColors.length > 0
+                ? `${selectedColors.length} color${selectedColors.length !== 1 ? 's' : ''} selected`
+                : 'Select one or more colors'}
+            </Text>
             <ScrollView style={{maxHeight: 240}}>
               {COLOR_OPTIONS.map(c => (
                 <TouchableOpacity key={c} style={styles.colorItem} onPress={() => toggleColor(c)}>
-                  <Text style={{flex:1}}>{c}</Text>
-                  <Text>{selectedColors.includes(c) ? '✓' : ''}</Text>
+                  <View style={styles.colorItemContent}>
+                    <View style={[styles.colorDot, { backgroundColor: getColorHex(c) }]} />
+                    <Text style={{flex:1}}>{c}</Text>
+                  </View>
+                  <Text style={styles.colorCheckmark}>{selectedColors.includes(c) ? '✓' : ''}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <View style={{flexDirection:'row', marginTop: 10}}>
               <TouchableOpacity style={[styles.button, {flex:1, backgroundColor:'#6c757d'}]} onPress={() => { setSelectedColors([]); }}>
-                <Text style={styles.buttonText}>Clear</Text>
+                <Text style={styles.buttonText}>Clear All</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.button, {flex:1}]} onPress={() => setColorsOpen(false)}>
                 <Text style={styles.buttonText}>Done</Text>
@@ -334,17 +355,31 @@ const UpdatePlate = ({ route }: Props) => {
       <Modal visible={numColorDropdownOpen} transparent animationType="slide" onRequestClose={() => setNumColorDropdownOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.title}>Select Number Color</Text>
-            <ScrollView style={{maxHeight: 200}}>
+            <Text style={styles.title}>Select Number Colors</Text>
+            <Text style={styles.modalSubtitle}>
+              {numColors.length > 0
+                ? `${numColors.length} color${numColors.length !== 1 ? 's' : ''} selected`
+                : 'Select one or more number colors'}
+            </Text>
+            <ScrollView style={{maxHeight: 240}}>
               {COLOR_OPTIONS.map(color => (
-                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => { setNumColor(color); setNumColorDropdownOpen(false); }}>
-                  <Text style={{flex:1}}>{color}</Text>
+                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => toggleNumColor(color)}>
+                  <View style={styles.colorItemContent}>
+                    <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
+                    <Text style={{flex:1}}>{color}</Text>
+                  </View>
+                  <Text style={styles.colorCheckmark}>{numColors.includes(color) ? '✓' : ''}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={[styles.button, {marginTop: 10}]} onPress={() => setNumColorDropdownOpen(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={{flexDirection:'row', marginTop: 10}}>
+              <TouchableOpacity style={[styles.button, {flex:1, backgroundColor:'#6c757d'}]} onPress={() => { setNumColors([]); }}>
+                <Text style={styles.buttonText}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, {flex:1}]} onPress={() => setNumColorDropdownOpen(false)}>
+                <Text style={styles.buttonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -353,17 +388,31 @@ const UpdatePlate = ({ route }: Props) => {
       <Modal visible={stateColorDropdownOpen} transparent animationType="slide" onRequestClose={() => setStateColorDropdownOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.title}>Select State Color</Text>
-            <ScrollView style={{maxHeight: 200}}>
+            <Text style={styles.title}>Select State Colors</Text>
+            <Text style={styles.modalSubtitle}>
+              {stateColors.length > 0
+                ? `${stateColors.length} color${stateColors.length !== 1 ? 's' : ''} selected`
+                : 'Select one or more state colors'}
+            </Text>
+            <ScrollView style={{maxHeight: 240}}>
               {COLOR_OPTIONS.map(color => (
-                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => { setStateColor(color); setStateColorDropdownOpen(false); }}>
-                  <Text style={{flex:1}}>{color}</Text>
+                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => toggleStateColor(color)}>
+                  <View style={styles.colorItemContent}>
+                    <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
+                    <Text style={{flex:1}}>{color}</Text>
+                  </View>
+                  <Text style={styles.colorCheckmark}>{stateColors.includes(color) ? '✓' : ''}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={[styles.button, {marginTop: 10}]} onPress={() => setStateColorDropdownOpen(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={{flexDirection:'row', marginTop: 10}}>
+              <TouchableOpacity style={[styles.button, {flex:1, backgroundColor:'#6c757d'}]} onPress={() => { setStateColors([]); }}>
+                <Text style={styles.buttonText}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, {flex:1}]} onPress={() => setStateColorDropdownOpen(false)}>
+                <Text style={styles.buttonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -372,17 +421,31 @@ const UpdatePlate = ({ route }: Props) => {
       <Modal visible={primaryBackgroundColorDropdownOpen} transparent animationType="slide" onRequestClose={() => setPrimaryBackgroundColorDropdownOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.title}>Select Primary Background Color</Text>
-            <ScrollView style={{maxHeight: 200}}>
+            <Text style={styles.title}>Select Primary Background Colors</Text>
+            <Text style={styles.modalSubtitle}>
+              {primaryBackgroundColors.length > 0
+                ? `${primaryBackgroundColors.length} color${primaryBackgroundColors.length !== 1 ? 's' : ''} selected`
+                : 'Select one or more background colors'}
+            </Text>
+            <ScrollView style={{maxHeight: 240}}>
               {COLOR_OPTIONS.map(color => (
-                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => { setPrimaryBackgroundColors(color); setPrimaryBackgroundColorDropdownOpen(false); }}>
-                  <Text style={{flex:1}}>{color}</Text>
+                <TouchableOpacity key={color} style={styles.colorItem} onPress={() => togglePrimaryBackgroundColor(color)}>
+                  <View style={styles.colorItemContent}>
+                    <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
+                    <Text style={{flex:1}}>{color}</Text>
+                  </View>
+                  <Text style={styles.colorCheckmark}>{primaryBackgroundColors.includes(color) ? '✓' : ''}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={[styles.button, {marginTop: 10}]} onPress={() => setPrimaryBackgroundColorDropdownOpen(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={{flexDirection:'row', marginTop: 10}}>
+              <TouchableOpacity style={[styles.button, {flex:1, backgroundColor:'#6c757d'}]} onPress={() => { setPrimaryBackgroundColors([]); }}>
+                <Text style={styles.buttonText}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, {flex:1}]} onPress={() => setPrimaryBackgroundColorDropdownOpen(false)}>
+                <Text style={styles.buttonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -391,10 +454,28 @@ const UpdatePlate = ({ route }: Props) => {
   );
 };
 
+// Helper function to get color hex values for visual display
+const getColorHex = (colorName: string): string => {
+  const colorMap: { [key: string]: string } = {
+    'Red': '#FF3B30',
+    'Orange': '#FF9500',
+    'Yellow': '#FFCC00',
+    'Green': '#34C759',
+    'Blue': '#007AFF',
+    'Dark Blue': '#003f87',
+    'Purple': '#AF52DE',
+    'Brown': '#A2845E',
+    'White': '#FFFFFF',
+    'Gray': '#8E8E93',
+    'Black': '#000000',
+  };
+  return colorMap[colorName] || '#999999';
+};
+
 export default UpdatePlate;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
+  container: { flex: 1, backgroundColor: '#fff', padding: 16, paddingTop: 32 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
   input: {
     borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
@@ -416,5 +497,9 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 16 },
   modalContent: { backgroundColor: '#fff', borderRadius: 10, padding: 16 },
+  modalSubtitle: { fontSize: 14, color: '#666', marginBottom: 16 },
   colorItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  colorItemContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  colorDot: { width: 24, height: 24, borderRadius: 12, marginRight: 12, borderWidth: 1, borderColor: '#ddd' },
+  colorCheckmark: { fontSize: 20, color: '#007bff', fontWeight: '700' },
 });

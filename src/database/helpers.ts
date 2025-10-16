@@ -95,15 +95,16 @@ export interface PlateFilters {
   notes?: string;
   text?: string;
   colors?: string[];  // Array of selected colors (all_colors + primary_background_colors)
-  primary_background_color?: string;  // Single background color
+  primary_background_colors?: string[];  // Array of background colors
   pattern_font?: string;  // Number font
   state_font?: string;
-  pattern_color?: string;  // Number color
-  state_color?: string;
+  pattern_colors?: string[];  // Array of pattern colors
+  state_colors?: string[];  // Array of state colors
   // Pattern filters
   pattern_text?: string;  // Search pattern text (exact match by default, use * for partial: *[T/R]*)
   pattern_type?: string;  // Search pattern type (e.g., Passenger, Truck)
   pattern_separator?: string;  // Search pattern separator
+  trip?: string;  // Filter plates that have sightings from this trip
 }
 
 export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate[]> => {
@@ -165,10 +166,6 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     where.push('LOWER(external_id) LIKE LOWER(?)');
     params.push(`%${filters.external_id.trim()}%`);
   }
-  if (filters.years_available?.trim()) {
-    where.push('years_available LIKE ?');
-    params.push(`%${filters.years_available.trim()}%`);
-  }
   if (filters.tags?.trim()) {
     where.push('LOWER(tags) LIKE LOWER(?)');
     params.push(`%${filters.tags.trim()}%`);
@@ -193,10 +190,15 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     });
   }
   
-  // Specific filters for plate properties
-  if (filters.primary_background_color?.trim()) {
-    where.push('LOWER(primary_background_colors) LIKE LOWER(?)');
-    params.push(`%${filters.primary_background_color.trim()}%`);
+  // Background color filters - multi-select
+  if (filters.primary_background_colors && filters.primary_background_colors.length > 0) {
+    const bgColorConditions = filters.primary_background_colors.map(() => 
+      'LOWER(primary_background_colors) LIKE LOWER(?)'
+    ).join(' OR ');
+    where.push(`(${bgColorConditions})`);
+    filters.primary_background_colors.forEach(color => {
+      params.push(`%${color}%`);
+    });
   }
   if (filters.pattern_font?.trim()) {
     where.push('LOWER(pattern_font) LIKE LOWER(?)');
@@ -206,13 +208,25 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     where.push('LOWER(state_font) LIKE LOWER(?)');
     params.push(`%${filters.state_font.trim()}%`);
   }
-  if (filters.pattern_color?.trim()) {
-    where.push('LOWER(pattern_color) LIKE LOWER(?)');
-    params.push(`%${filters.pattern_color.trim()}%`);
+  // Pattern color filters - multi-select
+  if (filters.pattern_colors && filters.pattern_colors.length > 0) {
+    const patternColorConditions = filters.pattern_colors.map(() => 
+      'LOWER(pattern_color) LIKE LOWER(?)'
+    ).join(' OR ');
+    where.push(`(${patternColorConditions})`);
+    filters.pattern_colors.forEach(color => {
+      params.push(`%${color}%`);
+    });
   }
-  if (filters.state_color?.trim()) {
-    where.push('LOWER(state_color) LIKE LOWER(?)');
-    params.push(`%${filters.state_color.trim()}%`);
+  // State color filters - multi-select
+  if (filters.state_colors && filters.state_colors.length > 0) {
+    const stateColorConditions = filters.state_colors.map(() => 
+      'LOWER(state_color) LIKE LOWER(?)'
+    ).join(' OR ');
+    where.push(`(${stateColorConditions})`);
+    filters.state_colors.forEach(color => {
+      params.push(`%${color}%`);
+    });
   }
 
   // Pattern filters - join with SerialPattern table
@@ -264,6 +278,16 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
         AND ${patternConditions.join(' AND ')}
       )`);
     }
+  }
+
+  // Trip filter - find plates that have sightings from this trip
+  if (filters.trip?.trim()) {
+    where.push(`EXISTS (
+      SELECT 1 FROM Sighting s 
+      WHERE s.plate_id = LicensePlate.plate_id 
+      AND LOWER(s.trip) LIKE LOWER(?)
+    )`);
+    params.push(`%${filters.trip.trim()}%`);
   }
 
   // Boolean filters
@@ -816,4 +840,34 @@ export const getTripNames = async (): Promise<string[]> => {
   const out: string[] = [];
   for (let i = 0; i < res.rows.length; i++) out.push(res.rows.item(i).name as string);
   return out;
+};
+
+// -------------------- Unidentified Plate -------------------
+
+export const ensureUnidentifiedPlateExists = async (): Promise<Plate> => {
+  // Check if "Unidentified Plate" already exists
+  const existingRes = await executeSql(
+    'SELECT * FROM LicensePlate WHERE name = ? AND external_id = ? LIMIT 1;',
+    ['Unidentified Plate', 'UNIDENTIFIED-PLATE']
+  );
+  
+  if (existingRes.rows.length > 0) {
+    return existingRes.rows.item(0);
+  }
+  
+  // Create the unidentified plate if it doesn't exist
+  const unidentifiedPlate: Plate = {
+    external_id: 'UNIDENTIFIED-PLATE',
+    name: 'Unidentified Plate',
+    state: 'Unknown',
+    country: 'Unknown',
+    available: true,
+    base: false,
+    embossed: false,
+    county: false,
+    url: false,
+    notes: 'Default plate for sightings where the specific plate is not known'
+  };
+  
+  return await addPlate(unidentifiedPlate);
 };

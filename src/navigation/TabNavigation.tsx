@@ -13,7 +13,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const TabNavigation=()=>{
     return(
-        <Tab.Navigator screenOptions={{headerShown: false}}>
+        <Tab.Navigator screenOptions={{headerShown: false, tabBarIconStyle: { display: "none" }, tabBarLabelStyle: { marginTop: 12, fontSize: 16 },}}>
             <Tab.Screen name="Plates" component={PlateNavigation}/>
             <Tab.Screen name="Sightings" component={SightingsNavigation}/>
         </Tab.Navigator>

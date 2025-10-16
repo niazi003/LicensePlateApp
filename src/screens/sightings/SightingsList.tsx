@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import ClearableTextInput from '../../components/ClearableTextInput';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   getSightingsPaged,
   countSightings,
@@ -83,29 +83,36 @@ const SightingsList = () => {
         setLoading(false);
       }
     },
-    [items], // depends only on items for pagination merging
+    [items, filters], // depends on items for pagination merging and filters for fallback
   );
 
   // 🔹 Initial load (only once)
   useEffect(() => {
     load(0, true);
-    
-    // Load available trips
-    const loadTrips = async () => {
-      try {
-        const trips = await getAllTripNames();
-        setAvailableTrips(trips);
-      } catch (error) {
-        console.error('Error loading trips:', error);
-      }
-    };
-    loadTrips();
+    loadAvailableTrips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 🔹 Refresh trips when screen comes into focus (in case new trips were added)
+  useFocusEffect(
+    useCallback(() => {
+      loadAvailableTrips();
+    }, [])
+  );
 
   // 🔹 Apply filters manually
   const applyFilters = () => {
     load(0, true, filters);
+  };
+
+  // 🔹 Load available trips
+  const loadAvailableTrips = async () => {
+    try {
+      const trips = await getAllTripNames();
+      setAvailableTrips(trips);
+    } catch (error) {
+      console.error('Error loading trips:', error);
+    }
   };
 
   // 🔹 Toggle filters collapse
@@ -201,7 +208,10 @@ const SightingsList = () => {
         />
         <TouchableOpacity 
           style={styles.tripSelectButton} 
-          onPress={() => setTripModalOpen(true)}
+          onPress={() => {
+            loadAvailableTrips(); // Refresh trips when opening modal
+            setTripModalOpen(true);
+          }}
         >
           <Text style={[
             styles.tripSelectText,
@@ -294,12 +304,22 @@ const SightingsList = () => {
       <Modal visible={tripModalOpen} transparent animationType="slide" onRequestClose={() => setTripModalOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Trip</Text>
-            <Text style={styles.modalSubtitle}>
-              {availableTrips.length > 0 
-                ? `${availableTrips.length} trip${availableTrips.length !== 1 ? 's' : ''} available`
-                : 'No trips found'}
-            </Text>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <Text style={styles.modalTitle}>Select Trip</Text>
+                <Text style={styles.modalSubtitle}>
+                  {availableTrips.length > 0 
+                    ? `${availableTrips.length} trip${availableTrips.length !== 1 ? 's' : ''} available`
+                    : 'No trips found'}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={loadAvailableTrips}
+              >
+                <Text style={styles.refreshButtonText}>🔄</Text>
+              </TouchableOpacity>
+            </View>
             {availableTrips.length > 0 ? (
               <ScrollView style={styles.tripList} showsVerticalScrollIndicator={true}>
                 {availableTrips.map(trip => (
@@ -346,7 +366,7 @@ const SightingsList = () => {
 export default SightingsList;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 12 },
+  container: { flex: 1, backgroundColor: '#fff', padding: 12, paddingTop: 32 },
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -473,6 +493,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '70%',
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  modalTitleContainer: {
+    flex: 1,
+  },
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
@@ -482,7 +511,15 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 16,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    marginLeft: 12,
+  },
+  refreshButtonText: {
+    fontSize: 18,
   },
   tripList: {
     maxHeight: 320,

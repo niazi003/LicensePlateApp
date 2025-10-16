@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Animated, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { fetchPlates } from '../../redux/plates/platesSlice';
 import { AppDispatch } from '../../redux/store';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { PlateStackParamList } from '../../navigation/PlateNavigation';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as db from '../../database/helpers';
@@ -35,14 +35,15 @@ const HomePage = () => {
         notes: '',
         text: '',
         colors: [],
-        primary_background_color: '',
+        primary_background_colors: [],
         pattern_font: '',
         state_font: '',
-        pattern_color: '',
-        state_color: '',
+        pattern_colors: [],
+        state_colors: [],
         pattern_text: '',
         pattern_type: '',
         pattern_separator: '',
+        trip: '',
     });
     const [results, setResults] = useState<Plate[]>([]);
     const [searching, setSearching] = useState(false);
@@ -57,6 +58,8 @@ const HomePage = () => {
     const [stateFontModalOpen, setStateFontModalOpen] = useState(false);
     const [patternColorModalOpen, setPatternColorModalOpen] = useState(false);
     const [stateColorModalOpen, setStateColorModalOpen] = useState(false);
+    const [tripModalOpen, setTripModalOpen] = useState(false);
+    const [availableTrips, setAvailableTrips] = useState<string[]>([]);
     const [universalSearch, setUniversalSearch] = useState('');
 
     useEffect(() => {
@@ -64,27 +67,48 @@ const HomePage = () => {
         dispatch(fetchPlates());
     }, [dispatch]);
 
+    // 🔹 Load available trips
+    const loadAvailableTrips = useCallback(async () => {
+        try {
+            const trips = await db.getAllTripNames();
+            setAvailableTrips(trips);
+        } catch (error) {
+            console.error('Error loading trips:', error);
+        }
+    }, []);
+
+    // 🔹 Load trips on component mount and when screen comes into focus
+    useEffect(() => {
+        loadAvailableTrips();
+    }, [loadAvailableTrips]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadAvailableTrips();
+        }, [loadAvailableTrips])
+    );
+
     // Check if any filters are active
     useEffect(() => {
-        const active = 
+        const active =
             universalSearch?.trim() ||
             filters.name?.trim() ||
             filters.state?.trim() ||
             filters.country?.trim() ||
             filters.external_id?.trim() ||
-            filters.years_available?.trim() ||
             filters.tags?.trim() ||
             filters.notes?.trim() ||
             filters.text?.trim() ||
             (filters.colors && filters.colors.length > 0) ||
-            filters.primary_background_color?.trim() ||
+            (filters.primary_background_colors && filters.primary_background_colors.length > 0) ||
             filters.pattern_font?.trim() ||
             filters.state_font?.trim() ||
-            filters.pattern_color?.trim() ||
-            filters.state_color?.trim() ||
+            (filters.pattern_colors && filters.pattern_colors.length > 0) ||
+            (filters.state_colors && filters.state_colors.length > 0) ||
             filters.pattern_text?.trim() ||
             filters.pattern_type?.trim() ||
             filters.pattern_separator?.trim() ||
+            filters.trip?.trim() ||
             (filters.available !== 'all') ||
             (filters.base !== 'all') ||
             (filters.embossed !== 'all') ||
@@ -100,45 +124,51 @@ const HomePage = () => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 // Check if any filters are set
-                const active = 
+                const active =
                     universalSearchText?.trim() ||
                     searchFilters.name?.trim() ||
                     searchFilters.state?.trim() ||
                     searchFilters.country?.trim() ||
                     searchFilters.external_id?.trim() ||
-                    searchFilters.years_available?.trim() ||
                     searchFilters.tags?.trim() ||
                     searchFilters.notes?.trim() ||
                     searchFilters.text?.trim() ||
                     (searchFilters.colors && searchFilters.colors.length > 0) ||
-                    searchFilters.primary_background_color?.trim() ||
+                    (searchFilters.primary_background_colors && searchFilters.primary_background_colors.length > 0) ||
                     searchFilters.pattern_font?.trim() ||
                     searchFilters.state_font?.trim() ||
-                    searchFilters.pattern_color?.trim() ||
-                    searchFilters.state_color?.trim() ||
+                    (searchFilters.pattern_colors && searchFilters.pattern_colors.length > 0) ||
+                    (searchFilters.state_colors && searchFilters.state_colors.length > 0) ||
                     searchFilters.pattern_text?.trim() ||
                     searchFilters.pattern_type?.trim() ||
                     searchFilters.pattern_separator?.trim() ||
+                    searchFilters.trip?.trim() ||
                     (searchFilters.available !== 'all') ||
                     (searchFilters.base !== 'all') ||
                     (searchFilters.embossed !== 'all') ||
                     (searchFilters.county !== 'all');
-                
+
                 if (!active) {
                     setResults([]);
                     return;
                 }
-                
+
                 // Create effective filters with universalSearch field
-                const effectiveFilters = { 
+                const effectiveFilters = {
                     ...searchFilters,
                     universalSearch: universalSearchText?.trim() || undefined
                 };
-                
+
                 setSearching(true);
                 db.searchPlatesAdvanced(effectiveFilters)
                     .then((rows) => {
-                        setResults(rows);
+                        // Sort plates by plate_id numerically
+                        const sortedRows = rows.sort((a, b) => {
+                            const aId = a.plate_id || 0;
+                            const bId = b.plate_id || 0;
+                            return aId - bId;
+                        });
+                        setResults(sortedRows);
                     })
                     .finally(() => {
                         setSearching(false);
@@ -176,14 +206,15 @@ const HomePage = () => {
             notes: '',
             text: '',
             colors: [],
-            primary_background_color: '',
+            primary_background_colors: [],
             pattern_font: '',
             state_font: '',
-            pattern_color: '',
-            state_color: '',
+            pattern_colors: [],
+            state_colors: [],
             pattern_text: '',
             pattern_type: '',
             pattern_separator: '',
+            trip: '',
         };
         setFilters(emptyFilters);
         setUniversalSearch('');
@@ -199,11 +230,38 @@ const HomePage = () => {
         handleFilterChange('colors', newColors);
     };
 
+    // Toggle background color selection
+    const toggleBackgroundColor = (color: string) => {
+        const currentColors = filters.primary_background_colors || [];
+        const newColors = currentColors.includes(color)
+            ? currentColors.filter(c => c !== color)
+            : [...currentColors, color];
+        handleFilterChange('primary_background_colors', newColors);
+    };
+
+    // Toggle pattern color selection
+    const togglePatternColor = (color: string) => {
+        const currentColors = filters.pattern_colors || [];
+        const newColors = currentColors.includes(color)
+            ? currentColors.filter(c => c !== color)
+            : [...currentColors, color];
+        handleFilterChange('pattern_colors', newColors);
+    };
+
+    // Toggle state color selection
+    const toggleStateColor = (color: string) => {
+        const currentColors = filters.state_colors || [];
+        const newColors = currentColors.includes(color)
+            ? currentColors.filter(c => c !== color)
+            : [...currentColors, color];
+        handleFilterChange('state_colors', newColors);
+    };
+
     // Toggle filters collapse
     const toggleFiltersCollapse = () => {
         const toHeight = filtersCollapsed ? 1 : 0;
         const toOpacity = filtersCollapsed ? 1 : 0;
-        
+
         Animated.parallel([
             Animated.timing(filtersHeight, {
                 toValue: toHeight,
@@ -220,7 +278,7 @@ const HomePage = () => {
     };
 
     return (
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
@@ -230,16 +288,16 @@ const HomePage = () => {
                 <Text style={styles.title}>Filter Plates</Text>
                 <View style={styles.headerButtons}>
                     {hasActiveFilters && (
-                        <TouchableOpacity 
-                            style={styles.clearButton} 
+                        <TouchableOpacity
+                            style={styles.clearButton}
                             onPress={clearAllFilters}
                             activeOpacity={0.7}
                         >
                             <Text style={styles.clearButtonText}>Clear</Text>
                         </TouchableOpacity>
                     )}
-                    <TouchableOpacity 
-                        style={[styles.collapseButton, filtersCollapsed && styles.collapseButtonCollapsed]} 
+                    <TouchableOpacity
+                        style={[styles.collapseButton, filtersCollapsed && styles.collapseButtonCollapsed]}
                         onPress={toggleFiltersCollapse}
                         activeOpacity={0.7}
                     >
@@ -265,10 +323,10 @@ const HomePage = () => {
                     autoCorrect={false}
                 />
             </View>
-            
+
             <Animated.View style={[
-                styles.filtersContainer, 
-                { 
+                styles.filtersContainer,
+                {
                     height: filtersHeight.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0, 500],
@@ -277,7 +335,7 @@ const HomePage = () => {
                     opacity: filtersOpacity
                 }
             ]}>
-                <ScrollView 
+                <ScrollView
                     style={styles.filtersScroll}
                     contentContainerStyle={styles.filtersScrollContent}
                     showsVerticalScrollIndicator={true}
@@ -289,7 +347,7 @@ const HomePage = () => {
                         {/* Primary Filters */}
                         <View style={styles.filterSection}>
                             <Text style={styles.sectionTitle}>Primary Filters</Text>
-                            
+
                             <Text style={styles.filterLabel}>Name</Text>
                             <ClearableTextInput
                                 style={styles.filterInput}
@@ -338,23 +396,12 @@ const HomePage = () => {
                                 autoCapitalize='none'
                                 autoCorrect={false}
                             />
-
-                            <Text style={styles.filterLabel}>Years Available</Text>
-                            <ClearableTextInput
-                                style={styles.filterInput}
-                                placeholder="e.g., 2010-2020"
-                                placeholderTextColor="gray"
-                                value={filters.years_available || ''}
-                                onChangeText={(val) => handleFilterChange('years_available', val)}
-                                autoCapitalize='none'
-                                autoCorrect={false}
-                            />
                         </View>
 
                         {/* Status Filters */}
                         <View style={styles.filterSection}>
                             <Text style={styles.sectionTitle}>Status Filters</Text>
-                            
+
                             <View style={styles.filterRow}>
                                 <View style={styles.filterHalf}>
                                     <Text style={styles.filterLabel}>Available</Text>
@@ -457,37 +504,34 @@ const HomePage = () => {
                         {/* Design Filters */}
                         <View style={styles.filterSection}>
                             <Text style={styles.sectionTitle}>Design Filters</Text>
-                            
-                            <Text style={styles.filterLabel}>Background Color</Text>
-                            <TouchableOpacity 
-                                style={styles.colorPickerButton} 
+
+                            <Text style={styles.filterLabel}>Background Colors (Multi-Select)</Text>
+                            <TouchableOpacity
+                                style={styles.colorPickerButton}
                                 onPress={() => setBackgroundColorModalOpen(true)}
                             >
-                                <View style={styles.dropdownContent}>
-                                    {filters.primary_background_color && (
-                                        <View style={[styles.colorDotSmall, { backgroundColor: getColorHex(filters.primary_background_color) }]} />
-                                    )}
-                                    <Text style={[
-                                        styles.colorPickerText,
-                                        filters.primary_background_color && styles.colorPickerTextActive
-                                    ]}>
-                                        {filters.primary_background_color || 'Select Background Color'}
-                                    </Text>
-                                </View>
+                                <Text style={[
+                                    styles.colorPickerText,
+                                    filters.primary_background_colors && filters.primary_background_colors.length > 0 && styles.colorPickerTextActive
+                                ]}>
+                                    {filters.primary_background_colors && filters.primary_background_colors.length > 0
+                                        ? filters.primary_background_colors.join(', ')
+                                        : 'Select Background Colors'}
+                                </Text>
                                 <Text style={styles.colorPickerArrow}>▼</Text>
                             </TouchableOpacity>
 
                             <Text style={styles.filterLabel}>All Colors (Multi-Select)</Text>
-                            <TouchableOpacity 
-                                style={styles.colorPickerButton} 
+                            <TouchableOpacity
+                                style={styles.colorPickerButton}
                                 onPress={() => setColorsModalOpen(true)}
                             >
                                 <Text style={[
                                     styles.colorPickerText,
                                     filters.colors && filters.colors.length > 0 && styles.colorPickerTextActive
                                 ]}>
-                                    {filters.colors && filters.colors.length > 0 
-                                        ? filters.colors.join(', ') 
+                                    {filters.colors && filters.colors.length > 0
+                                        ? filters.colors.join(', ')
                                         : 'Select Colors'}
                                 </Text>
                                 <Text style={styles.colorPickerArrow}>▼</Text>
@@ -496,8 +540,8 @@ const HomePage = () => {
                             <View style={styles.filterRow}>
                                 <View style={styles.filterHalf}>
                                     <Text style={styles.filterLabel}>Number Font</Text>
-                                    <TouchableOpacity 
-                                        style={styles.colorPickerButton} 
+                                    <TouchableOpacity
+                                        style={styles.colorPickerButton}
                                         onPress={() => setPatternFontModalOpen(true)}
                                     >
                                         <Text style={[
@@ -511,8 +555,8 @@ const HomePage = () => {
                                 </View>
                                 <View style={styles.filterHalf}>
                                     <Text style={styles.filterLabel}>State Font</Text>
-                                    <TouchableOpacity 
-                                        style={styles.colorPickerButton} 
+                                    <TouchableOpacity
+                                        style={styles.colorPickerButton}
                                         onPress={() => setStateFontModalOpen(true)}
                                     >
                                         <Text style={[
@@ -528,42 +572,36 @@ const HomePage = () => {
 
                             <View style={styles.filterRow}>
                                 <View style={styles.filterHalf}>
-                                    <Text style={styles.filterLabel}>Number Color</Text>
-                                    <TouchableOpacity 
-                                        style={styles.colorPickerButton} 
+                                    <Text style={styles.filterLabel}>Number Colors</Text>
+                                    <TouchableOpacity
+                                        style={styles.colorPickerButton}
                                         onPress={() => setPatternColorModalOpen(true)}
                                     >
-                                        <View style={styles.dropdownContent}>
-                                            {filters.pattern_color && (
-                                                <View style={[styles.colorDotSmall, { backgroundColor: getColorHex(filters.pattern_color) }]} />
-                                            )}
-                                            <Text style={[
-                                                styles.colorPickerText,
-                                                filters.pattern_color && styles.colorPickerTextActive
-                                            ]}>
-                                                {filters.pattern_color || 'Select Color'}
-                                            </Text>
-                                        </View>
+                                        <Text style={[
+                                            styles.colorPickerText,
+                                            filters.pattern_colors && filters.pattern_colors.length > 0 && styles.colorPickerTextActive
+                                        ]}>
+                                            {filters.pattern_colors && filters.pattern_colors.length > 0
+                                                ? filters.pattern_colors.join(', ')
+                                                : 'Select Colors'}
+                                        </Text>
                                         <Text style={styles.colorPickerArrow}>▼</Text>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={styles.filterHalf}>
-                                    <Text style={styles.filterLabel}>State Color</Text>
-                                    <TouchableOpacity 
-                                        style={styles.colorPickerButton} 
+                                    <Text style={styles.filterLabel}>State Colors</Text>
+                                    <TouchableOpacity
+                                        style={styles.colorPickerButton}
                                         onPress={() => setStateColorModalOpen(true)}
                                     >
-                                        <View style={styles.dropdownContent}>
-                                            {filters.state_color && (
-                                                <View style={[styles.colorDotSmall, { backgroundColor: getColorHex(filters.state_color) }]} />
-                                            )}
-                                            <Text style={[
-                                                styles.colorPickerText,
-                                                filters.state_color && styles.colorPickerTextActive
-                                            ]}>
-                                                {filters.state_color || 'Select Color'}
-                                            </Text>
-                                        </View>
+                                        <Text style={[
+                                            styles.colorPickerText,
+                                            filters.state_colors && filters.state_colors.length > 0 && styles.colorPickerTextActive
+                                        ]}>
+                                            {filters.state_colors && filters.state_colors.length > 0
+                                                ? filters.state_colors.join(', ')
+                                                : 'Select Colors'}
+                                        </Text>
                                         <Text style={styles.colorPickerArrow}>▼</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -573,7 +611,7 @@ const HomePage = () => {
                         {/* Additional Filters */}
                         <View style={styles.filterSection}>
                             <Text style={styles.sectionTitle}>Additional Filters</Text>
-                            
+
                             <Text style={styles.filterLabel}>Tags</Text>
                             <ClearableTextInput
                                 style={styles.filterInput}
@@ -614,7 +652,7 @@ const HomePage = () => {
                             <Text style={styles.sectionSubtitle}>
                                 Exact match by default. Use * for partial: *[T/R]*
                             </Text>
-                            
+
                             <Text style={styles.filterLabel}>Pattern Text</Text>
                             <ClearableTextInput
                                 style={styles.filterInput}
@@ -652,6 +690,31 @@ const HomePage = () => {
                                     />
                                 </View>
                             </View>
+                        </View>
+
+                        {/* Trip Filter */}
+                        <View style={styles.filterSection}>
+                            <Text style={styles.sectionTitle}>🗺️ Trip Filter</Text>
+                            <Text style={styles.sectionSubtitle}>
+                                Show plates that have been sighted on specific trips
+                            </Text>
+
+                            <Text style={styles.filterLabel}>Trip</Text>
+                            <TouchableOpacity 
+                                style={styles.colorPickerButton} 
+                                onPress={() => {
+                                    loadAvailableTrips(); // Refresh trips when opening modal
+                                    setTripModalOpen(true);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.colorPickerText,
+                                    filters.trip && styles.colorPickerTextActive
+                                ]}>
+                                    {filters.trip || 'Select Trip'}
+                                </Text>
+                                <Text style={styles.colorPickerArrow}>▼</Text>
+                            </TouchableOpacity>
                         </View>
 
                         {searching && (
@@ -758,15 +821,15 @@ const HomePage = () => {
                     <View style={styles.colorModalContent}>
                         <Text style={styles.colorModalTitle}>Select Colors</Text>
                         <Text style={styles.colorModalSubtitle}>
-                            {filters.colors && filters.colors.length > 0 
+                            {filters.colors && filters.colors.length > 0
                                 ? `${filters.colors.length} color${filters.colors.length !== 1 ? 's' : ''} selected`
                                 : 'Select one or more colors'}
                         </Text>
                         <ScrollView style={styles.colorList} showsVerticalScrollIndicator={true}>
                             {COLOR_OPTIONS.map(color => (
-                                <TouchableOpacity 
-                                    key={color} 
-                                    style={styles.colorItem} 
+                                <TouchableOpacity
+                                    key={color}
+                                    style={styles.colorItem}
                                     onPress={() => toggleColor(color)}
                                     activeOpacity={0.7}
                                 >
@@ -781,14 +844,14 @@ const HomePage = () => {
                             ))}
                         </ScrollView>
                         <View style={styles.colorModalActions}>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
                                 onPress={() => handleFilterChange('colors', [])}
                             >
                                 <Text style={styles.colorModalButtonTextSecondary}>Clear All</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
                                 onPress={() => setColorsModalOpen(false)}
                             >
                                 <Text style={styles.colorModalButtonText}>Done</Text>
@@ -798,38 +861,46 @@ const HomePage = () => {
                 </View>
             </Modal>
 
-            {/* Background Color Modal (Single Select) */}
+            {/* Background Color Modal (Multi-Select) */}
             <Modal visible={backgroundColorModalOpen} transparent animationType="slide" onRequestClose={() => setBackgroundColorModalOpen(false)}>
                 <View style={styles.modalBackdrop}>
                     <View style={styles.colorModalContent}>
-                        <Text style={styles.colorModalTitle}>Select Background Color</Text>
+                        <Text style={styles.colorModalTitle}>Select Background Colors</Text>
+                        <Text style={styles.colorModalSubtitle}>
+                            {filters.primary_background_colors && filters.primary_background_colors.length > 0
+                                ? `${filters.primary_background_colors.length} color${filters.primary_background_colors.length !== 1 ? 's' : ''} selected`
+                                : 'Select one or more background colors'}
+                        </Text>
                         <ScrollView style={styles.colorList} showsVerticalScrollIndicator={true}>
                             {COLOR_OPTIONS.map(color => (
-                                <TouchableOpacity 
-                                    key={color} 
-                                    style={styles.colorItem} 
-                                    onPress={() => { handleFilterChange('primary_background_color', color); setBackgroundColorModalOpen(false); }}
+                                <TouchableOpacity
+                                    key={color}
+                                    style={styles.colorItem}
+                                    onPress={() => toggleBackgroundColor(color)}
                                     activeOpacity={0.7}
                                 >
                                     <View style={styles.colorItemContent}>
                                         <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
                                         <Text style={styles.colorItemText}>{color}</Text>
                                     </View>
+                                    {filters.primary_background_colors && filters.primary_background_colors.includes(color) && (
+                                        <Text style={styles.colorCheckmark}>✓</Text>
+                                    )}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                         <View style={styles.colorModalActions}>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
-                                onPress={() => { handleFilterChange('primary_background_color', ''); setBackgroundColorModalOpen(false); }}
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
+                                onPress={() => handleFilterChange('primary_background_colors', [])}
                             >
-                                <Text style={styles.colorModalButtonTextSecondary}>Clear</Text>
+                                <Text style={styles.colorModalButtonTextSecondary}>Clear All</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
                                 onPress={() => setBackgroundColorModalOpen(false)}
                             >
-                                <Text style={styles.colorModalButtonText}>Cancel</Text>
+                                <Text style={styles.colorModalButtonText}>Done</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -843,9 +914,9 @@ const HomePage = () => {
                         <Text style={styles.colorModalTitle}>Select Number Font</Text>
                         <View style={styles.optionsList}>
                             {FONT_OPTIONS.map(font => (
-                                <TouchableOpacity 
-                                    key={font} 
-                                    style={styles.optionItem} 
+                                <TouchableOpacity
+                                    key={font}
+                                    style={styles.optionItem}
                                     onPress={() => { handleFilterChange('pattern_font', font); setPatternFontModalOpen(false); }}
                                     activeOpacity={0.7}
                                 >
@@ -854,14 +925,14 @@ const HomePage = () => {
                             ))}
                         </View>
                         <View style={styles.colorModalActions}>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
                                 onPress={() => { handleFilterChange('pattern_font', ''); setPatternFontModalOpen(false); }}
                             >
                                 <Text style={styles.colorModalButtonTextSecondary}>Clear</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
                                 onPress={() => setPatternFontModalOpen(false)}
                             >
                                 <Text style={styles.colorModalButtonText}>Cancel</Text>
@@ -878,9 +949,9 @@ const HomePage = () => {
                         <Text style={styles.colorModalTitle}>Select State Font</Text>
                         <View style={styles.optionsList}>
                             {FONT_OPTIONS.map(font => (
-                                <TouchableOpacity 
-                                    key={font} 
-                                    style={styles.optionItem} 
+                                <TouchableOpacity
+                                    key={font}
+                                    style={styles.optionItem}
                                     onPress={() => { handleFilterChange('state_font', font); setStateFontModalOpen(false); }}
                                     activeOpacity={0.7}
                                 >
@@ -889,14 +960,14 @@ const HomePage = () => {
                             ))}
                         </View>
                         <View style={styles.colorModalActions}>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
                                 onPress={() => { handleFilterChange('state_font', ''); setStateFontModalOpen(false); }}
                             >
                                 <Text style={styles.colorModalButtonTextSecondary}>Clear</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
                                 onPress={() => setStateFontModalOpen(false)}
                             >
                                 <Text style={styles.colorModalButtonText}>Cancel</Text>
@@ -906,74 +977,150 @@ const HomePage = () => {
                 </View>
             </Modal>
 
-            {/* Number Color Modal */}
+            {/* Number Color Modal (Multi-Select) */}
             <Modal visible={patternColorModalOpen} transparent animationType="slide" onRequestClose={() => setPatternColorModalOpen(false)}>
                 <View style={styles.modalBackdrop}>
                     <View style={styles.colorModalContent}>
-                        <Text style={styles.colorModalTitle}>Select Number Color</Text>
+                        <Text style={styles.colorModalTitle}>Select Number Colors</Text>
+                        <Text style={styles.colorModalSubtitle}>
+                            {filters.pattern_colors && filters.pattern_colors.length > 0
+                                ? `${filters.pattern_colors.length} color${filters.pattern_colors.length !== 1 ? 's' : ''} selected`
+                                : 'Select one or more number colors'}
+                        </Text>
                         <ScrollView style={styles.colorList} showsVerticalScrollIndicator={true}>
                             {COLOR_OPTIONS.map(color => (
-                                <TouchableOpacity 
-                                    key={color} 
-                                    style={styles.colorItem} 
-                                    onPress={() => { handleFilterChange('pattern_color', color); setPatternColorModalOpen(false); }}
+                                <TouchableOpacity
+                                    key={color}
+                                    style={styles.colorItem}
+                                    onPress={() => togglePatternColor(color)}
                                     activeOpacity={0.7}
                                 >
                                     <View style={styles.colorItemContent}>
                                         <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
                                         <Text style={styles.colorItemText}>{color}</Text>
                                     </View>
+                                    {filters.pattern_colors && filters.pattern_colors.includes(color) && (
+                                        <Text style={styles.colorCheckmark}>✓</Text>
+                                    )}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                         <View style={styles.colorModalActions}>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
-                                onPress={() => { handleFilterChange('pattern_color', ''); setPatternColorModalOpen(false); }}
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
+                                onPress={() => handleFilterChange('pattern_colors', [])}
                             >
-                                <Text style={styles.colorModalButtonTextSecondary}>Clear</Text>
+                                <Text style={styles.colorModalButtonTextSecondary}>Clear All</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
                                 onPress={() => setPatternColorModalOpen(false)}
                             >
-                                <Text style={styles.colorModalButtonText}>Cancel</Text>
+                                <Text style={styles.colorModalButtonText}>Done</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* State Color Modal */}
+            {/* State Color Modal (Multi-Select) */}
             <Modal visible={stateColorModalOpen} transparent animationType="slide" onRequestClose={() => setStateColorModalOpen(false)}>
                 <View style={styles.modalBackdrop}>
                     <View style={styles.colorModalContent}>
-                        <Text style={styles.colorModalTitle}>Select State Color</Text>
+                        <Text style={styles.colorModalTitle}>Select State Colors</Text>
+                        <Text style={styles.colorModalSubtitle}>
+                            {filters.state_colors && filters.state_colors.length > 0
+                                ? `${filters.state_colors.length} color${filters.state_colors.length !== 1 ? 's' : ''} selected`
+                                : 'Select one or more state colors'}
+                        </Text>
                         <ScrollView style={styles.colorList} showsVerticalScrollIndicator={true}>
                             {COLOR_OPTIONS.map(color => (
-                                <TouchableOpacity 
-                                    key={color} 
-                                    style={styles.colorItem} 
-                                    onPress={() => { handleFilterChange('state_color', color); setStateColorModalOpen(false); }}
+                                <TouchableOpacity
+                                    key={color}
+                                    style={styles.colorItem}
+                                    onPress={() => toggleStateColor(color)}
                                     activeOpacity={0.7}
                                 >
                                     <View style={styles.colorItemContent}>
                                         <View style={[styles.colorDot, { backgroundColor: getColorHex(color) }]} />
                                         <Text style={styles.colorItemText}>{color}</Text>
                                     </View>
+                                    {filters.state_colors && filters.state_colors.includes(color) && (
+                                        <Text style={styles.colorCheckmark}>✓</Text>
+                                    )}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                         <View style={styles.colorModalActions}>
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonSecondary]}
+                                onPress={() => handleFilterChange('state_colors', [])}
+                            >
+                                <Text style={styles.colorModalButtonTextSecondary}>Clear All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.colorModalButton, styles.colorModalButtonPrimary]}
+                                onPress={() => setStateColorModalOpen(false)}
+                            >
+                                <Text style={styles.colorModalButtonText}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Trip Selection Modal */}
+            <Modal visible={tripModalOpen} transparent animationType="slide" onRequestClose={() => setTripModalOpen(false)}>
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.colorModalContent}>
+                        <View style={styles.modalHeader}>
+                            <View style={styles.modalTitleContainer}>
+                                <Text style={styles.colorModalTitle}>Select Trip</Text>
+                                <Text style={styles.colorModalSubtitle}>
+                                    {availableTrips.length > 0 
+                                        ? `${availableTrips.length} trip${availableTrips.length !== 1 ? 's' : ''} available`
+                                        : 'No trips found'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={styles.refreshButton}
+                                onPress={loadAvailableTrips}
+                            >
+                                <Text style={styles.refreshButtonText}>🔄</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {availableTrips.length > 0 ? (
+                            <ScrollView style={styles.colorList} showsVerticalScrollIndicator={true}>
+                                {availableTrips.map(trip => (
+                                    <TouchableOpacity 
+                                        key={trip} 
+                                        style={styles.colorItem} 
+                                        onPress={() => { handleFilterChange('trip', trip); setTripModalOpen(false); }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.colorItemText}>{trip}</Text>
+                                        {filters.trip === trip && (
+                                            <Text style={styles.colorCheckmark}>✓</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.emptyTripContainer}>
+                                <Text style={styles.emptyTripText}>No trips available</Text>
+                                <Text style={styles.emptyTripSubtext}>Add sightings with trip names to use this filter</Text>
+                            </View>
+                        )}
+                        <View style={styles.colorModalActions}>
                             <TouchableOpacity 
                                 style={[styles.colorModalButton, styles.colorModalButtonSecondary]} 
-                                onPress={() => { handleFilterChange('state_color', ''); setStateColorModalOpen(false); }}
+                                onPress={() => { handleFilterChange('trip', ''); setTripModalOpen(false); }}
                             >
                                 <Text style={styles.colorModalButtonTextSecondary}>Clear</Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
                                 style={[styles.colorModalButton, styles.colorModalButtonPrimary]} 
-                                onPress={() => setStateColorModalOpen(false)}
+                                onPress={() => setTripModalOpen(false)}
                             >
                                 <Text style={styles.colorModalButtonText}>Cancel</Text>
                             </TouchableOpacity>
@@ -1012,7 +1159,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 16,
-        backgroundColor: '#f5f5f5'
+        paddingTop: 32,
+        backgroundColor: '#f5f5f5',
     },
     headerContainer: {
         flexDirection: 'row',
@@ -1467,5 +1615,38 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: '600'
     },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    modalTitleContainer: {
+        flex: 1,
+    },
+    refreshButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+        marginLeft: 12,
+    },
+    refreshButtonText: {
+        fontSize: 18,
+    },
+    emptyTripContainer: {
+        paddingVertical: 32,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+    },
+    emptyTripText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 8,
+    },
+    emptyTripSubtext: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+    },
 });
-

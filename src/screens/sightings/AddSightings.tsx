@@ -253,13 +253,33 @@ const AddSightings = () => {
     (async () => {
       if (!prefillPlateId) {
         try {
+          // Ensure unidentified plate exists
+          await db.ensureUnidentifiedPlateExists();
+          
           const plates = await db.getAllPlates();
           setAllPlates(plates);
-          setPlateItems(plates.map(plate => ({
+          
+          // Create plate items with unidentified plate first
+          const plateItemsList = plates.map(plate => ({
             label: `${plate.name} (${plate.state}, ${plate.country})`,
             value: plate.plate_id,
             external_id: plate.external_id
-          })));
+          }));
+          
+          // Sort so "Unidentified Plate" appears first
+          plateItemsList.sort((a, b) => {
+            if (a.external_id === 'UNIDENTIFIED-PLATE') return -1;
+            if (b.external_id === 'UNIDENTIFIED-PLATE') return 1;
+            return a.label.localeCompare(b.label);
+          });
+          
+          setPlateItems(plateItemsList);
+          
+          // Set unidentified plate as default selection
+          const unidentifiedPlate = plates.find(p => p.external_id === 'UNIDENTIFIED-PLATE');
+          if (unidentifiedPlate) {
+            setPlateId(unidentifiedPlate.plate_id);
+          }
         } catch (error) {
           console.error('Error loading plates:', error);
         }
@@ -293,7 +313,7 @@ const AddSightings = () => {
 
 
   const canSave = useMemo(() => {
-    return !!plateId;
+    return !!plateId; // Always true now since we default to "Unidentified Plate"
   }, [plateId]);
 
   const handleAddTrip = async () => {
@@ -364,7 +384,6 @@ const AddSightings = () => {
 
   const save = async () => {
     if (!canSave || saving) {
-      if (!plateId) setErrorMsg('Please select a plate before saving.');
       return;
     }
     setErrorMsg('');
@@ -580,7 +599,7 @@ const AddSightings = () => {
       )}
 
       {/* Notes */}
-      <Text style={styles.fieldLabel}>Notes (required if no plate)</Text>
+      <Text style={styles.fieldLabel}>Notes</Text>
       <ClearableTextInput
         style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
         multiline
@@ -718,7 +737,7 @@ const AddSightings = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
+  container: { flex: 1, backgroundColor: '#fff', padding: 16, paddingTop: 32 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
   input: {
     borderWidth: 1,

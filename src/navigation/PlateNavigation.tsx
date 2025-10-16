@@ -31,26 +31,26 @@ const Stack = createStackNavigator<PlateStackParamList>();
 const PlateNavigation = () => {
     return (
         <Stack.Navigator initialRouteName='Home'>
-            <Stack.Screen name="Home" component={HomePage} options={{ title: 'Plates' }} />
-            <Stack.Screen name="AddPlate" component={AddPlate} options={{ title: 'Add Plate' }} />
-            <Stack.Screen name="PlateDetail" component={PlateDetail} options={{ title: 'Plate Details' }} />
-            <Stack.Screen name="UpdatePlate" component={UpdatePlate} options={{ title: 'Update Plate' }} />
+            <Stack.Screen name="Home" component={HomePage} options={{ title: 'Plates', headerShown: false }} />
+            <Stack.Screen name="AddPlate" component={AddPlate} options={{ title: 'Add Plate', headerShown: false }} />
+            <Stack.Screen name="PlateDetail" component={PlateDetail} options={{ title: 'Plate Details', headerShown: false }} />
+            <Stack.Screen name="UpdatePlate" component={UpdatePlate} options={{ title: 'Update Plate', headerShown: false }} />
             {/*Nest Sightings Screen*/}
-            <Stack.Screen 
+            <Stack.Screen
                 name="SightingsNav"
                 component={SightingsNavigation}
                 options={{headerShown: false}}
             />
             {/* Pattern routes under Plate stack */}
-            <Stack.Screen name="AddPattern" component={AddPattern} options={{ title: 'Add Pattern' }} />
-            <Stack.Screen name="PatternDetail" component={PatternDetail} options={{ title: 'Pattern Details' }} />
-            <Stack.Screen name="UpdatePattern" component={UpdatePattern} options={{ title: 'Update Pattern' }} />
+            <Stack.Screen name="AddPattern" component={AddPattern} options={{ title: 'Add Pattern', headerShown: false }} />
+            <Stack.Screen name="PatternDetail" component={PatternDetail} options={{ title: 'Pattern Details', headerShown: false }} />
+            <Stack.Screen name="UpdatePattern" component={UpdatePattern} options={{ title: 'Update Pattern', headerShown: false }} />
             {/* Quick Add Sighting from Plate context */}
-            <Stack.Screen name="AddSighting" component={AddSightings} options={{ title: 'Add Sighting' }} />
+            <Stack.Screen name="AddSighting" component={AddSightings} options={{ title: 'Add Sighting', headerShown: false }} />
             {/* Sighting Detail from Plate context */}
-            <Stack.Screen name="SightingDetail" component={SightingDetail} options={{ title: 'Sighting Details' }} />
+            <Stack.Screen name="SightingDetail" component={SightingDetail} options={{ title: 'Sighting Details', headerShown: false }} />
             {/* Update Sighting from Plate context */}
-            <Stack.Screen name="UpdateSighting" component={UpdateSightings} options={{ title: 'Update Sighting' }} />
+            <Stack.Screen name="UpdateSighting" component={UpdateSightings} options={{ title: 'Update Sighting', headerShown: false }} />
         </Stack.Navigator>
     );
 };

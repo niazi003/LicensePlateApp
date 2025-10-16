@@ -83,14 +83,13 @@ const PlateDetail = ({ route }: Props) => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header with Quick Actions */}
       <View style={styles.headerCard}>
         <View style={styles.headerContent}>
           <View style={styles.headerText}>
             <Text style={styles.title}>{plate.name || 'Unnamed Plate'}</Text>
             <Text style={styles.subTitle}>{plate.state}, {plate.country}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickActionsButton}
             onPress={() => setQuickActionsOpen(true)}
             activeOpacity={0.7}
@@ -230,19 +229,19 @@ const PlateDetail = ({ route }: Props) => {
         animationType="slide"
         onRequestClose={() => setQuickActionsOpen(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setQuickActionsOpen(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalContent}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>⚡ Quick Actions</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setQuickActionsOpen(false)}
                 style={styles.modalCloseButton}
               >
@@ -251,18 +250,6 @@ const PlateDetail = ({ route }: Props) => {
             </View>
 
             <View style={styles.actionsGrid}>
-              {/* Add Sighting */}
-              <TouchableOpacity
-                style={[styles.actionCard, styles.actionPrimary]}
-                onPress={() => {
-                  setQuickActionsOpen(false);
-                  navigation.navigate('AddSighting', { plateId });
-                }}
-              >
-                <Text style={styles.actionIcon}>📸</Text>
-                <Text style={styles.actionTitle}>Add Sighting</Text>
-                <Text style={styles.actionSubtitle}>Record a new sighting</Text>
-              </TouchableOpacity>
 
               {/* Add Pattern */}
               <TouchableOpacity
@@ -288,6 +275,19 @@ const PlateDetail = ({ route }: Props) => {
                 <Text style={styles.actionIcon}>✏️</Text>
                 <Text style={styles.actionTitle}>Update Plate</Text>
                 <Text style={styles.actionSubtitle}>Edit plate details</Text>
+              </TouchableOpacity>
+
+              {/* Add Sighting */}
+              <TouchableOpacity
+                style={[styles.actionCard, styles.actionPrimary]}
+                onPress={() => {
+                  setQuickActionsOpen(false);
+                  navigation.navigate('AddSighting', { plateId });
+                }}
+              >
+                <Text style={styles.actionIcon}>📸</Text>
+                <Text style={styles.actionTitle}>Add Sighting</Text>
+                <Text style={styles.actionSubtitle}>Record a new sighting</Text>
               </TouchableOpacity>
 
               {/* View Patterns */}
@@ -321,7 +321,7 @@ const PlateDetail = ({ route }: Props) => {
               )}
 
               {/* Delete Plate */}
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[styles.actionCard, styles.actionDanger]}
                 onPress={() => {
                   setQuickActionsOpen(false);
@@ -331,8 +331,10 @@ const PlateDetail = ({ route }: Props) => {
                 <Text style={styles.actionIcon}>🗑️</Text>
                 <Text style={styles.actionTitle}>Delete Plate</Text>
                 <Text style={styles.actionSubtitle}>Remove permanently</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
+
+
 
             <TouchableOpacity
               style={styles.modalCancelButton}
@@ -350,14 +352,14 @@ const PlateDetail = ({ route }: Props) => {
 export default PlateDetail;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#f8f9fa', paddingTop: 32 },
   loading: { padding: 20, textAlign: 'center' },
 
-  headerCard: { 
-    backgroundColor: '#fff', 
-    padding: 16, 
-    margin: 10, 
-    borderRadius: 12, 
+  headerCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    margin: 10,
+    borderRadius: 12,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -461,7 +463,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionsGrid: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 20,

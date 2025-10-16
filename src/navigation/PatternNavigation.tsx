@@ -17,10 +17,10 @@ const Stack = createStackNavigator<PatternStackParamList>();
 const PatternNavigation = () => {
   return (
     <Stack.Navigator initialRouteName="PatternList">
-      <Stack.Screen name="PatternList" component={PatternList} options={{ title: 'Patterns' }} />
-      <Stack.Screen name="AddPattern" component={AddPattern} options={{ title: 'Add Pattern' }} />
-      <Stack.Screen name="PatternDetail" component={PatternDetail} options={{ title: 'Pattern Details' }} />
-      <Stack.Screen name="UpdatePattern" component={UpdatePattern} options={{ title: 'Update Pattern' }} />
+      <Stack.Screen name="PatternList" component={PatternList} options={{ title: 'Patterns', headerShown: false }} />
+      <Stack.Screen name="AddPattern" component={AddPattern} options={{ title: 'Add Pattern', headerShown: false }} />
+      <Stack.Screen name="PatternDetail" component={PatternDetail} options={{ title: 'Pattern Details', headerShown: false }} />
+      <Stack.Screen name="UpdatePattern" component={UpdatePattern} options={{ title: 'Update Pattern', headerShown: false }} />
     </Stack.Navigator>
   );
 };

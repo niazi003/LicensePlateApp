@@ -20,22 +20,22 @@ const SightingsNavigation = () => {
       <Stack.Screen
         name="SightingsList"
         component={SightingsList}
-        options={{ title: 'Sightings' }}
+        options={{ title: 'Sightings', headerShown: false }}
       />
       <Stack.Screen
         name="SightingDetail"
         component={SightingDetail}
-        options={{ title: 'Sighting Details' }}
+        options={{ title: 'Sighting Details', headerShown: false }}
       />
       <Stack.Screen
         name="AddSighting"
         component={AddSightings}
-        options={{ title: 'Add Sighting' }}
+        options={{ title: 'Add Sighting', headerShown: false }}
       />
       <Stack.Screen
         name="UpdateSighting"
         component={UpdateSightings}
-        options={{ title: 'Update Sighting' }}
+        options={{ title: 'Update Sighting', headerShown: false }}
       />
     </Stack.Navigator>
   );
