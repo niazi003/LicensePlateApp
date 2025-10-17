@@ -156,6 +156,7 @@ export const initDB = async (): Promise<void> => {
     console.log('full_address column might already exist');
   }
 
+
   // Seed TripName table from Sighting
   await executeSql(`
     INSERT OR IGNORE INTO TripName(name)
