@@ -818,6 +818,9 @@ const HomePage = () => {
                         <TouchableOpacity style={styles.drawerBtn} onPress={() => { setActionsOpen(false); (navigation as any).navigate('AddSighting'); }}>
                             <Text style={styles.drawerText}>Add Sighting</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity style={styles.drawerBtn} onPress={() => { setActionsOpen(false); navigation.navigate('ImportImages'); }}>
+                            <Text style={styles.drawerText}>📁 Import Images</Text>
+                        </TouchableOpacity>
                         <View style={{ marginTop: 10 }}>
                             <ImportPlatesCSV />
                         </View>

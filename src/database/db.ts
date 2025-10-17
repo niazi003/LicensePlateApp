@@ -91,6 +91,21 @@ export const initDB = async (): Promise<void> => {
   `);
   console.log('LicensePlate table created successfully');
 
+  // PlateImages table for storing multiple images per plate
+  console.log('Creating PlateImages table...');
+  await executeSql(`
+    CREATE TABLE IF NOT EXISTS PlateImages (
+      image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plate_id INTEGER NOT NULL,
+      image_uri TEXT NOT NULL,
+      image_name TEXT,
+      image_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (plate_id) REFERENCES LicensePlate (plate_id) ON DELETE CASCADE
+    );
+  `);
+  console.log('PlateImages table created successfully');
+
   // SerialPattern table
   await executeSql(`
     CREATE TABLE IF NOT EXISTS SerialPattern (

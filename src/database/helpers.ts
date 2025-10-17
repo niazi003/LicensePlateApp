@@ -497,6 +497,112 @@ export const updatePlate = async (p: Plate): Promise<void> => {
   );
 };
 
+// Image-specific helper functions
+export const updatePlateImage = async (plateId: number, imageUri: string | null): Promise<void> => {
+  const sanitizeValue = (value: any): string | null => {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.toString().trim();
+    return trimmed === '' ? null : trimmed;
+  };
+
+  await executeSql(
+    'UPDATE LicensePlate SET image_uri = ? WHERE plate_id = ?',
+    [sanitizeValue(imageUri), plateId]
+  );
+};
+
+export const findPlateByLocationAndName = async (country: string, state: string, name: string): Promise<Plate | null> => {
+  const result = await executeSql(
+    'SELECT * FROM LicensePlate WHERE LOWER(country) = LOWER(?) AND LOWER(state) = LOWER(?) AND LOWER(name) = LOWER(?)',
+    [country, state, name]
+  );
+
+  if (result.rows.length > 0) {
+    return result.rows.item(0);
+  }
+  return null;
+};
+
+export const getPlatesWithImages = async (): Promise<Plate[]> => {
+  const result = await executeSql('SELECT * FROM LicensePlate WHERE image_uri IS NOT NULL');
+  const plates: Plate[] = [];
+  for (let i = 0; i < result.rows.length; i++) {
+    plates.push(result.rows.item(i));
+  }
+  return plates;
+};
+
+export const getPlatesWithoutImages = async (): Promise<Plate[]> => {
+  const result = await executeSql('SELECT * FROM LicensePlate WHERE image_uri IS NULL');
+  const plates: Plate[] = [];
+  for (let i = 0; i < result.rows.length; i++) {
+    plates.push(result.rows.item(i));
+  }
+  return plates;
+};
+
+export const getImageStats = async (): Promise<{ total: number; withImages: number; withoutImages: number }> => {
+  const totalResult = await executeSql('SELECT COUNT(*) as count FROM LicensePlate');
+  const withImagesResult = await executeSql('SELECT COUNT(*) as count FROM LicensePlate WHERE image_uri IS NOT NULL');
+  
+  const total = totalResult.rows.item(0).count;
+  const withImages = withImagesResult.rows.item(0).count;
+  
+  return {
+    total,
+    withImages,
+    withoutImages: total - withImages
+  };
+};
+
+// Multiple images per plate functions
+export interface PlateImage {
+  image_id?: number;
+  plate_id: number;
+  image_uri: string;
+  image_name?: string;
+  image_order?: number;
+  created_at?: string;
+}
+
+export const addPlateImage = async (plateImage: PlateImage): Promise<number> => {
+  const result = await executeSql(
+    'INSERT INTO PlateImages (plate_id, image_uri, image_name, image_order) VALUES (?, ?, ?, ?)',
+    [plateImage.plate_id, plateImage.image_uri, plateImage.image_name || null, plateImage.image_order || 0]
+  );
+  return result.insertId;
+};
+
+export const getPlateImages = async (plateId: number): Promise<PlateImage[]> => {
+  const result = await executeSql(
+    'SELECT * FROM PlateImages WHERE plate_id = ? ORDER BY image_order ASC, created_at ASC',
+    [plateId]
+  );
+  
+  const images: PlateImage[] = [];
+  for (let i = 0; i < result.rows.length; i++) {
+    images.push(result.rows.item(i));
+  }
+  return images;
+};
+
+export const deletePlateImage = async (imageId: number): Promise<void> => {
+  await executeSql('DELETE FROM PlateImages WHERE image_id = ?', [imageId]);
+};
+
+export const updatePlateImageOrder = async (imageId: number, newOrder: number): Promise<void> => {
+  await executeSql('UPDATE PlateImages SET image_order = ? WHERE image_id = ?', [newOrder, imageId]);
+};
+
+export const getPlateImagesCount = async (plateId: number): Promise<number> => {
+  const result = await executeSql('SELECT COUNT(*) as count FROM PlateImages WHERE plate_id = ?', [plateId]);
+  return result.rows.item(0).count;
+};
+
+export const deleteAllPlateImages = async (plateId: number): Promise<void> => {
+  await executeSql('DELETE FROM PlateImages WHERE plate_id = ?', [plateId]);
+};
+
 export const deletePlate = async (plate_id: number): Promise<void> => {
   await executeSql('DELETE FROM LicensePlate WHERE plate_id=?;', [plate_id]);
 };

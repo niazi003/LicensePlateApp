@@ -9,6 +9,7 @@ import {
   ScrollView,
   Modal,
   Image,
+  Dimensions,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../redux/store';
@@ -18,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { deletePlateThunk } from '../../redux/plates/platesSlice';
 import { fetchPatternsByPlate } from '../../redux/patterns/patternsSlice';
 import { fetchSightingsByPlate } from '../../redux/sightings/sightingsSlice';
+import { getPlateImages, PlateImage } from '../../database/helpers';
 
 type DetailRoute = RouteProp<PlateStackParamList, 'PlateDetail'>;
 type NavProp = StackNavigationProp<PlateStackParamList, 'PlateDetail'>;
@@ -32,6 +34,9 @@ const PlateDetail = ({ route }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const [showDelete, setShowDelete] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [plateImages, setPlateImages] = useState<PlateImage[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   // Helper function to format comma-separated lists
   const formatList = (text: string | undefined | null): string => {
@@ -55,7 +60,38 @@ const PlateDetail = ({ route }: Props) => {
   useEffect(() => {
     dispatch(fetchPatternsByPlate(plateId));
     dispatch(fetchSightingsByPlate(plateId));
+    loadPlateImages();
   }, [dispatch, plateId]);
+
+  const loadPlateImages = async () => {
+    try {
+      const images = await getPlateImages(plateId);
+      setPlateImages(images);
+    } catch (error) {
+      console.error('Error loading plate images:', error);
+    }
+  };
+
+  const openImageModal = (index: number) => {
+    setSelectedImageIndex(index);
+    setShowImageModal(true);
+  };
+
+  const closeImageModal = () => {
+    setShowImageModal(false);
+  };
+
+  const nextImage = () => {
+    if (selectedImageIndex < plateImages.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1);
+    }
+  };
+
+  const prevImage = () => {
+    if (selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1);
+    }
+  };
 
   if (!plate) return <Text style={styles.loading}>Loading...</Text>;
 
@@ -101,15 +137,52 @@ const PlateDetail = ({ route }: Props) => {
         </View>
       </View>
 
-      {/* Plate Image */}
-      {plate.image_uri && (
+      {/* Plate Images Gallery */}
+      {(plateImages.length > 0 || plate.image_uri) && (
         <View style={styles.imageCard}>
-          <Text style={styles.section}>Plate Image</Text>
-          <Image
-            source={{ uri: plate.image_uri }}
-            style={styles.plateImage}
-            resizeMode="cover"
-          />
+          <Text style={styles.section}>
+            Plate Images {plateImages.length > 0 && `(${plateImages.length})`}
+          </Text>
+          
+          {/* Show multiple images in a horizontal scroll */}
+          {plateImages.length > 0 ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageGallery}
+            >
+              {plateImages.map((image, index) => (
+                <TouchableOpacity
+                  key={image.image_id}
+                  onPress={() => openImageModal(index)}
+                  style={styles.imageThumbnail}
+                >
+                  <Image
+                    source={{ uri: image.image_uri }}
+                    style={styles.thumbnailImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.imageOverlay}>
+                    <Text style={styles.imageNumber}>{index + 1}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : plate.image_uri ? (
+            // Fallback to single image from plate.image_uri
+            <TouchableOpacity onPress={() => {
+              // Create temporary image array for modal
+              const tempImages = [{ image_uri: plate.image_uri!, image_id: 0 }];
+              setPlateImages(tempImages);
+              openImageModal(0);
+            }}>
+              <Image
+                source={{ uri: plate.image_uri }}
+                style={styles.plateImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
 
@@ -365,6 +438,65 @@ const PlateDetail = ({ route }: Props) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Image Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeImageModal}
+      >
+        <View style={styles.imageModalBackdrop}>
+          <TouchableOpacity 
+            style={styles.imageModalCloseArea}
+            onPress={closeImageModal}
+            activeOpacity={1}
+          >
+            <View style={styles.imageModalContent}>
+              <TouchableOpacity 
+                style={styles.imageModalCloseButton}
+                onPress={closeImageModal}
+              >
+                <Text style={styles.imageModalCloseText}>✕</Text>
+              </TouchableOpacity>
+              
+              {plateImages.length > 0 && (
+                <>
+                  <Image
+                    source={{ uri: plateImages[selectedImageIndex]?.image_uri }}
+                    style={styles.imageModalImage}
+                    resizeMode="contain"
+                  />
+                  
+                  {plateImages.length > 1 && (
+                    <View style={styles.imageModalControls}>
+                      <TouchableOpacity
+                        style={[styles.imageModalNavButton, selectedImageIndex === 0 && styles.imageModalNavButtonDisabled]}
+                        onPress={prevImage}
+                        disabled={selectedImageIndex === 0}
+                      >
+                        <Text style={styles.imageModalNavText}>‹</Text>
+                      </TouchableOpacity>
+                      
+                      <Text style={styles.imageModalCounter}>
+                        {selectedImageIndex + 1} / {plateImages.length}
+                      </Text>
+                      
+                      <TouchableOpacity
+                        style={[styles.imageModalNavButton, selectedImageIndex === plateImages.length - 1 && styles.imageModalNavButtonDisabled]}
+                        onPress={nextImage}
+                        disabled={selectedImageIndex === plateImages.length - 1}
+                      >
+                        <Text style={styles.imageModalNavText}>›</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -429,6 +561,110 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
+  },
+  imageGallery: {
+    marginTop: 8,
+  },
+  imageThumbnail: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  thumbnailImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageNumber: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  imageModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseArea: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalContent: {
+    width: '90%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  imageModalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageModalControls: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  imageModalNavButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalNavButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  imageModalNavText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  imageModalCounter: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   detail: { fontSize: 14, marginBottom: 6, color: '#333' },
   bold: { fontWeight: 'bold' },
