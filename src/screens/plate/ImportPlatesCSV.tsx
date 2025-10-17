@@ -52,6 +52,7 @@ const normalizeRow = (rawRow: any) => {
     all_colors: (lower['all_colors'] || '').toString().trim(),
     background_description: (lower['background_description'] || '').toString().trim(),
     county: (lower['county'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
+    county_name: (lower['county_name'] || '').toString().trim(),
     url: (lower['url'] || 'FALSE').toString().trim().toUpperCase() === 'TRUE' ? 1 : 0,
     text: (lower['text'] || '').toString().trim(),
     tags: (lower['tags'] || '').toString().trim(),
@@ -134,14 +135,14 @@ export default function ImportPlatesCSV() {
               external_id, state, country, name, years_available, available, base, embossed,
               pattern_font, pattern_color, state_font, state_color, state_location,
               primary_background_colors, all_colors, background_description,
-              county, url, text, tags, additional_description, notes
-              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
+              county, county_name, url, text, tags, additional_description, notes
+              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
             [
               row.external_id, row.state, row.country, row.name, row.years_available,
               row.available, row.base, row.embossed,
               row.pattern_font, row.pattern_color, row.state_font, row.state_color, row.state_location,
               row.primary_background_colors, row.all_colors, row.background_description,
-              row.county, row.url, row.text, row.tags,
+              row.county, row.county_name, row.url, row.text, row.tags,
               row.additional_description, row.notes,
             ]
           );

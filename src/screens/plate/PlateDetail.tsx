@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../redux/store';
@@ -100,6 +101,18 @@ const PlateDetail = ({ route }: Props) => {
         </View>
       </View>
 
+      {/* Plate Image */}
+      {plate.image_uri && (
+        <View style={styles.imageCard}>
+          <Text style={styles.section}>Plate Image</Text>
+          <Image
+            source={{ uri: plate.image_uri }}
+            style={styles.plateImage}
+            resizeMode="cover"
+          />
+        </View>
+      )}
+
       {/* Details */}
       <View style={styles.card}>
         <Text style={styles.section}>Details</Text>
@@ -127,7 +140,14 @@ const PlateDetail = ({ route }: Props) => {
           Plate Text: {plate.text || <Text style={ {color: 'gray'} }>None</Text>}
         </Text>
 
-        <Text style={styles.detail}>{plate.county ? 'Has County Sticker' : 'No County Sticker'}; {plate.url ? 'Has URL' : 'No URL'}</Text>
+        <Text style={styles.detail}>
+          {plate.county ? (
+            plate.county_name ? (
+              <>County: <Text style={styles.bold}>{plate.county_name}</Text></>
+            ) : 'Has County Sticker'
+          ) : 'No County Sticker'
+          }; {plate.url ? 'Has URL' : 'No URL'}
+        </Text>
         <Text style={styles.detail}>
           Tags:
           <Text style={styles.bold}> {formatList(plate.tags)}</Text>
@@ -402,7 +422,14 @@ const styles = StyleSheet.create({
   },
 
   card: { backgroundColor: '#fff', padding: 16, margin: 10, borderRadius: 10, elevation: 2 },
+  imageCard: { backgroundColor: '#fff', padding: 16, margin: 10, borderRadius: 10, elevation: 2 },
   section: { fontSize: 18, fontWeight: '600', marginBottom: 10 },
+  plateImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
   detail: { fontSize: 14, marginBottom: 6, color: '#333' },
   bold: { fontWeight: 'bold' },
   italics: { fontStyle: 'italic' },

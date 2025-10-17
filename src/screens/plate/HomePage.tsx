@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Animated, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Animated, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { fetchPlates } from '../../redux/plates/platesSlice';
 import { AppDispatch } from '../../redux/store';
@@ -8,6 +8,7 @@ import { PlateStackParamList } from '../../navigation/PlateNavigation';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as db from '../../database/helpers';
 import ClearableTextInput from '../../components/ClearableTextInput';
+import TagSelector from '../../components/TagSelector';
 
 import ImportPlatesCSV from './ImportPlatesCSV';
 import { Plate, PlateFilters } from '../../database/helpers';
@@ -31,7 +32,7 @@ const HomePage = () => {
         base: 'all',
         embossed: 'all',
         county: 'all',
-        tags: '',
+        tags: [],
         notes: '',
         text: '',
         colors: [],
@@ -96,7 +97,7 @@ const HomePage = () => {
             filters.state?.trim() ||
             filters.country?.trim() ||
             filters.external_id?.trim() ||
-            filters.tags?.trim() ||
+            (filters.tags && filters.tags.length > 0) ||
             filters.notes?.trim() ||
             filters.text?.trim() ||
             (filters.colors && filters.colors.length > 0) ||
@@ -130,7 +131,7 @@ const HomePage = () => {
                     searchFilters.state?.trim() ||
                     searchFilters.country?.trim() ||
                     searchFilters.external_id?.trim() ||
-                    searchFilters.tags?.trim() ||
+                    (searchFilters.tags && searchFilters.tags.length > 0) ||
                     searchFilters.notes?.trim() ||
                     searchFilters.text?.trim() ||
                     (searchFilters.colors && searchFilters.colors.length > 0) ||
@@ -202,7 +203,7 @@ const HomePage = () => {
             base: 'all',
             embossed: 'all',
             county: 'all',
-            tags: '',
+            tags: [],
             notes: '',
             text: '',
             colors: [],
@@ -220,6 +221,7 @@ const HomePage = () => {
         setUniversalSearch('');
         setResults([]);
     };
+
 
     // Toggle color selection
     const toggleColor = (color: string) => {
@@ -613,14 +615,12 @@ const HomePage = () => {
                             <Text style={styles.sectionTitle}>Additional Filters</Text>
 
                             <Text style={styles.filterLabel}>Tags</Text>
-                            <ClearableTextInput
+                            <TagSelector
+                                selectedTags={filters.tags || []}
+                                onTagsChange={(tags) => handleFilterChange('tags', tags)}
+                                placeholder="Select Tags"
                                 style={styles.filterInput}
-                                placeholder="Search by tags"
-                                placeholderTextColor="gray"
-                                value={filters.tags || ''}
-                                onChangeText={(val) => handleFilterChange('tags', val)}
-                                autoCapitalize='none'
-                                autoCorrect={false}
+                                allowAddNew={false}
                             />
 
                             <Text style={styles.filterLabel}>Text on Plate</Text>
@@ -742,8 +742,8 @@ const HomePage = () => {
                 style={styles.list}
                 contentContainerStyle={styles.listContainer}
                 getItemLayout={(data, index) => ({
-                    length: 60, // Approximate height of each item
-                    offset: 60 * index,
+                    length: 74, // Approximate height of each item (increased for image)
+                    offset: 74 * index,
                     index,
                 })}
                 ListEmptyComponent={
@@ -765,6 +765,19 @@ const HomePage = () => {
                         onPress={() => navigation.navigate('PlateDetail', { plateId: item.plate_id! })}
                     >
                         <View style={styles.plateContent}>
+                            <View style={styles.imageContainer}>
+                                {item.image_uri ? (
+                                    <Image
+                                        source={{ uri: item.image_uri }}
+                                        style={styles.plateImage}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <View style={styles.placeholderImage}>
+                                        <Text style={styles.placeholderText}>🏷️</Text>
+                                    </View>
+                                )}
+                            </View>
                             <View style={styles.plateMainInfo}>
                                 <Text style={styles.plateName} numberOfLines={1}>
                                     {item.name || '(Unnamed)'}
@@ -1533,8 +1546,30 @@ const styles = StyleSheet.create({
     },
     plateContent: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    imageContainer: {
+        width: 50,
+        height: 50,
+        marginRight: 12,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#f0f0f0',
+    },
+    plateImage: {
+        width: '100%',
+        height: '100%',
+    },
+    placeholderImage: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f0f0f0',
+    },
+    placeholderText: {
+        fontSize: 20,
+        color: '#999',
     },
     plateMainInfo: {
         flex: 1,

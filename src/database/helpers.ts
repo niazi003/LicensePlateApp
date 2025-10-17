@@ -20,11 +20,13 @@ export interface Plate {
   all_colors?: string;
   background_description?: string; // maps to "background_description"
   county?: boolean;
+  county_name?: string;
   url?: boolean;
   text?: string;
   tags?: string;   // maps to "tags"
   additional_description?: string; // maps to "additional_description"
   notes?: string;
+  image_uri?: string;
 }
 
 export interface Pattern {
@@ -91,7 +93,7 @@ export interface PlateFilters {
   base?: boolean | 'all';
   embossed?: boolean | 'all';
   county?: boolean | 'all';
-  tags?: string;
+  tags?: string[];  // Array of selected tags for multi-tag search
   notes?: string;
   text?: string;
   colors?: string[];  // Array of selected colors (all_colors + primary_background_colors)
@@ -166,9 +168,15 @@ export const searchPlatesAdvanced = async (filters: PlateFilters): Promise<Plate
     where.push('LOWER(external_id) LIKE LOWER(?)');
     params.push(`%${filters.external_id.trim()}%`);
   }
-  if (filters.tags?.trim()) {
-    where.push('LOWER(tags) LIKE LOWER(?)');
-    params.push(`%${filters.tags.trim()}%`);
+  // Tag filters - multi-select using PlateTag table
+  if (filters.tags && filters.tags.length > 0) {
+    const tagConditions = filters.tags.map(() => 
+      'EXISTS (SELECT 1 FROM PlateTag pt WHERE pt.plate_id = LicensePlate.plate_id AND LOWER(pt.tag_name) = LOWER(?))'
+    ).join(' AND ');
+    where.push(`(${tagConditions})`);
+    filters.tags.forEach(tag => {
+      params.push(tag.trim());
+    });
   }
   if (filters.notes?.trim()) {
     where.push('LOWER(notes) LIKE LOWER(?)');
@@ -407,11 +415,13 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
     all_colors: sanitizeValue(p.all_colors),
     background_description: sanitizeValue(p.background_description),
     county: p.county ? 1 : 0,
+    county_name: sanitizeValue(p.county_name),
     url: p.url ? 1 : 0,
     text: sanitizeValue(p.text),
     tags: sanitizeValue(p.tags),
     additional_description: sanitizeValue(p.additional_description),
     notes: sanitizeValue(p.notes),
+    image_uri: sanitizeValue(p.image_uri),
   };
 
   try {
@@ -419,7 +429,7 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
       'external_id', 'state', 'country', 'name', 'years_available', 'available', 'base', 'embossed',
       'pattern_font', 'pattern_color', 'state_font', 'state_color', 'state_location',
       'primary_background_colors', 'all_colors', 'background_description',
-      'county', 'url', 'text', 'tags', 'additional_description', 'notes'
+      'county', 'url', 'text', 'tags', 'additional_description', 'notes', 'image_uri'
     ];
     
     const values = [
@@ -428,7 +438,7 @@ export const addPlate = async (p: Plate): Promise<Plate> => {
       sanitizedPlate.pattern_font, sanitizedPlate.pattern_color, sanitizedPlate.state_font, sanitizedPlate.state_color, sanitizedPlate.state_location,
       sanitizedPlate.primary_background_colors, sanitizedPlate.all_colors, sanitizedPlate.background_description,
       sanitizedPlate.county, sanitizedPlate.url, sanitizedPlate.text, sanitizedPlate.tags,
-      sanitizedPlate.additional_description, sanitizedPlate.notes,
+      sanitizedPlate.additional_description, sanitizedPlate.notes, sanitizedPlate.image_uri,
     ];
     
     const placeholders = values.map(() => '?').join(', ');
@@ -474,15 +484,15 @@ export const updatePlate = async (p: Plate): Promise<void> => {
       state=?, country=?, name=?, years_available=?, available=?, base=?, embossed=?,
       pattern_font=?, pattern_color=?, state_font=?, state_color=?, state_location=?,
       primary_background_colors=?, all_colors=?, background_description=?,
-      county=?, url=?, text=?, tags=?, additional_description=?, notes=?
+      county=?, county_name=?, url=?, text=?, tags=?, additional_description=?, notes=?, image_uri=?
      WHERE plate_id=?;`,
     [
       sanitizeValue(p.state), sanitizeValue(p.country), sanitizeValue(p.name), sanitizeValue(p.years_available),
       p.available ? 1 : 0, p.base ? 1 : 0, p.embossed ? 1 : 0,
       sanitizeValue(p.pattern_font), sanitizeValue(p.pattern_color), sanitizeValue(p.state_font), sanitizeValue(p.state_color), sanitizeValue(p.state_location),
       sanitizeValue(p.primary_background_colors), sanitizeValue(p.all_colors), sanitizeValue(p.background_description),
-      p.county ? 1 : 0, p.url ? 1 : 0, sanitizeValue(p.text), sanitizeValue(p.tags),
-      sanitizeValue(p.additional_description), sanitizeValue(p.notes), p.plate_id,
+      p.county ? 1 : 0, sanitizeValue(p.county_name), p.url ? 1 : 0, sanitizeValue(p.text), sanitizeValue(p.tags),
+      sanitizeValue(p.additional_description), sanitizeValue(p.notes), sanitizeValue(p.image_uri), p.plate_id,
     ],
   );
 };
@@ -818,15 +828,21 @@ export const countSightings = async (filters?: SightingsFilter): Promise<number>
 // -------------------- Trip names -------------------
 
 export const getAllTripNames = async (): Promise<string[]> => {
-  const res = await executeSql(
-    `SELECT DISTINCT TRIM(trip) as trip
-     FROM Sighting
-     WHERE trip IS NOT NULL AND TRIM(trip) <> ''
-     ORDER BY LOWER(trip);`
-  );
-  const names: string[] = [];
-  for (let i = 0; i < res.rows.length; i++) names.push(res.rows.item(i).trip as string);
-  return names;
+  try {
+    const res = await executeSql(
+      `SELECT DISTINCT TRIM(trip) as trip
+       FROM Sighting
+       WHERE trip IS NOT NULL AND TRIM(trip) <> ''
+       ORDER BY LOWER(trip);`
+    );
+    const names: string[] = [];
+    for (let i = 0; i < res.rows.length; i++) names.push(res.rows.item(i).trip as string);
+    return names;
+  } catch (error) {
+    console.error('Error loading trips:', error);
+    // Return empty array if Sighting table doesn't exist or query fails
+    return [];
+  }
 };
 
 export const addTripName = async (name: string): Promise<void> => {
@@ -840,6 +856,166 @@ export const getTripNames = async (): Promise<string[]> => {
   const out: string[] = [];
   for (let i = 0; i < res.rows.length; i++) out.push(res.rows.item(i).name as string);
   return out;
+};
+
+// County management functions
+export const getCountiesForState = async (state: string): Promise<string[]> => {
+  const res = await executeSql(
+    'SELECT name FROM CountyName WHERE state = ? ORDER BY LOWER(name);',
+    [state]
+  );
+  const counties: string[] = [];
+  for (let i = 0; i < res.rows.length; i++) {
+    counties.push(res.rows.item(i).name as string);
+  }
+  return counties;
+};
+
+export const addCounty = async (state: string, countyName: string): Promise<void> => {
+  await executeSql(
+    'INSERT OR IGNORE INTO CountyName (state, name) VALUES (?, ?);',
+    [state, countyName]
+  );
+};
+
+// -------------------- Tag management -------------------
+
+export const getAllTagNames = async (): Promise<string[]> => {
+  try {
+    const res = await executeSql(
+      `SELECT DISTINCT TRIM(tag_name) as tag_name
+       FROM PlateTag
+       WHERE tag_name IS NOT NULL AND TRIM(tag_name) <> ''
+       ORDER BY LOWER(tag_name);`
+    );
+    const names: string[] = [];
+    for (let i = 0; i < res.rows.length; i++) names.push(res.rows.item(i).tag_name as string);
+    return names;
+  } catch (error) {
+    console.error('Error loading tags:', error);
+    return [];
+  }
+};
+
+export const getTagNames = async (): Promise<string[]> => {
+  const res = await executeSql(`SELECT name FROM TagName ORDER BY LOWER(name);`);
+  const out: string[] = [];
+  for (let i = 0; i < res.rows.length; i++) out.push(res.rows.item(i).name as string);
+  return out;
+};
+
+export const addTagName = async (name: string): Promise<void> => {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return;
+  await executeSql(`INSERT OR IGNORE INTO TagName(name) VALUES (?);`, [trimmed]);
+};
+
+export const getTagsForPlate = async (plate_id: number): Promise<string[]> => {
+  const res = await executeSql(
+    'SELECT tag_name FROM PlateTag WHERE plate_id = ? ORDER BY LOWER(tag_name);',
+    [plate_id]
+  );
+  const tags: string[] = [];
+  for (let i = 0; i < res.rows.length; i++) {
+    tags.push(res.rows.item(i).tag_name as string);
+  }
+  return tags;
+};
+
+export const setTagsForPlate = async (plate_id: number, tags: string[]): Promise<void> => {
+  // First, remove all existing tags for this plate
+  await executeSql('DELETE FROM PlateTag WHERE plate_id = ?;', [plate_id]);
+  
+  // Then add the new tags
+  for (const tag of tags) {
+    const trimmed = (tag || '').trim();
+    if (trimmed) {
+      // Add to TagName table first (ignore if exists)
+      await addTagName(trimmed);
+      // Add to PlateTag table
+      await executeSql(
+        'INSERT OR IGNORE INTO PlateTag (plate_id, tag_name) VALUES (?, ?);',
+        [plate_id, trimmed]
+      );
+    }
+  }
+};
+
+// Debug function to check tag migration status
+export const debugTagMigration = async (): Promise<void> => {
+  try {
+    console.log('=== Tag Migration Debug ===');
+    
+    // Check plates with tags in old format
+    const platesWithOldTags = await executeSql(`
+      SELECT plate_id, name, tags FROM LicensePlate 
+      WHERE tags IS NOT NULL AND TRIM(tags) <> ''
+      LIMIT 5
+    `);
+    console.log('Plates with old format tags:', platesWithOldTags.rows.length);
+    for (let i = 0; i < platesWithOldTags.rows.length; i++) {
+      const row = platesWithOldTags.rows.item(i);
+      console.log(`  Plate ${row.plate_id} (${row.name}): "${row.tags}"`);
+    }
+    
+    // Check TagName table
+    const tagNames = await executeSql('SELECT COUNT(*) as count FROM TagName');
+    console.log('Tags in TagName table:', tagNames.rows.item(0).count);
+    
+    // Check PlateTag table
+    const plateTags = await executeSql('SELECT COUNT(*) as count FROM PlateTag');
+    console.log('Relationships in PlateTag table:', plateTags.rows.item(0).count);
+    
+    // Show some sample tags
+    const sampleTags = await executeSql('SELECT name FROM TagName LIMIT 10');
+    console.log('Sample tags:');
+    for (let i = 0; i < sampleTags.rows.length; i++) {
+      console.log(`  - ${sampleTags.rows.item(i).name}`);
+    }
+    
+    console.log('=== End Debug ===');
+  } catch (error) {
+    console.error('Debug error:', error);
+  }
+};
+
+// Test function to verify tag search is working
+export const testTagSearch = async (): Promise<void> => {
+  try {
+    console.log('=== Tag Search Test ===');
+    
+    // Test searching for "Solid" tag
+    const testFilters: PlateFilters = {
+      tags: ['Solid']
+    };
+    
+    console.log('Testing search for "Solid" tag...');
+    const results = await searchPlatesAdvanced(testFilters);
+    console.log(`Found ${results.length} plates with "Solid" tag`);
+    
+    for (let i = 0; i < Math.min(results.length, 5); i++) {
+      const plate = results[i];
+      console.log(`  - Plate ${plate.plate_id}: ${plate.name}`);
+    }
+    
+    // Test searching for "Sun" tag
+    const testFilters2: PlateFilters = {
+      tags: ['Sun']
+    };
+    
+    console.log('Testing search for "Sun" tag...');
+    const results2 = await searchPlatesAdvanced(testFilters2);
+    console.log(`Found ${results2.length} plates with "Sun" tag`);
+    
+    for (let i = 0; i < Math.min(results2.length, 5); i++) {
+      const plate = results2[i];
+      console.log(`  - Plate ${plate.plate_id}: ${plate.name}`);
+    }
+    
+    console.log('=== End Tag Search Test ===');
+  } catch (error) {
+    console.error('Tag search test error:', error);
+  }
 };
 
 // -------------------- Unidentified Plate -------------------

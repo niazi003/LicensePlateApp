@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../redux/store';
@@ -18,6 +19,9 @@ import { updatePlateThunk } from '../../redux/plates/platesSlice';
 import { RouteProp, useNavigation } from '@react-navigation/native';
 import { PlateStackParamList } from '../../navigation/PlateNavigation';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { getCountiesForState, addCounty, getTagsForPlate, setTagsForPlate } from '../../database/helpers';
+import TagSelector from '../../components/TagSelector';
+import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 
 type UpdateRoute = RouteProp<PlateStackParamList, 'UpdatePlate'>;
 type NavProp = StackNavigationProp<PlateStackParamList, 'UpdatePlate'>;
@@ -49,12 +53,14 @@ const UpdatePlate = ({ route }: Props) => {
   const [stateFont, setStateFont] = useState('');
   const [stateColors, setStateColors] = useState<string[]>([]);
   const [stateLocation, setStateLocation] = useState<'Top' | 'Bottom' | ''>('');
-  const [featuresTags, setFeaturesTags] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [text, setText] = useState('');
   const [county, setCounty] = useState(false);
+  const [countyName, setCountyName] = useState('');
   const [url, setUrl] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
   const [colorsOpen, setColorsOpen] = useState(false);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
@@ -66,6 +72,11 @@ const UpdatePlate = ({ route }: Props) => {
   const [numColorDropdownOpen, setNumColorDropdownOpen] = useState(false);
   const [stateColorDropdownOpen, setStateColorDropdownOpen] = useState(false);
   const [primaryBackgroundColorDropdownOpen, setPrimaryBackgroundColorDropdownOpen] = useState(false);
+  const [countyDropdownOpen, setCountyDropdownOpen] = useState(false);
+  const [showAddCounty, setShowAddCounty] = useState(false);
+  const [newCountyName, setNewCountyName] = useState('');
+  const [availableCounties, setAvailableCounties] = useState<string[]>([]);
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   const COLOR_OPTIONS = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Dark Blue', 'Purple', 'Brown', 'White', 'Gray', 'Black'];
   const FONT_OPTIONS = ['Serif', 'Sans-Serif', 'Script'];
@@ -88,8 +99,89 @@ const UpdatePlate = ({ route }: Props) => {
 
   const composeFeaturesTags = (): string => {
     const metas = [stateLocation ? `state_location=${stateLocation}` : null].filter(Boolean) as string[];
-    const baseTags = featuresTags?.trim() ? [featuresTags.trim()] : [];
-    return [...metas, ...baseTags].join(';');
+    return [...metas, ...selectedTags].join(';');
+  };
+
+  // Load counties when state changes
+  useEffect(() => {
+    const loadCounties = async () => {
+      if (stateVal) {
+        try {
+          const counties = await getCountiesForState(stateVal);
+          setAvailableCounties(counties);
+        } catch (error) {
+          console.error('Error loading counties:', error);
+          setAvailableCounties([]);
+        }
+      } else {
+        setAvailableCounties([]);
+      }
+    };
+    loadCounties();
+  }, [stateVal]);
+
+  // County dropdown data
+  const countyOptions = useMemo(() => {
+    return [
+      ...availableCounties.map(county => ({ label: county, value: county })),
+      { label: '+ Add New County', value: 'ADD_NEW' }
+    ];
+  }, [availableCounties]);
+
+  const handleAddCounty = async () => {
+    if (!newCountyName.trim() || !stateVal) return;
+    
+    try {
+      // Add county to database
+      await addCounty(stateVal, newCountyName.trim());
+      
+      // Update local state
+      setAvailableCounties(prev => [...prev, newCountyName.trim()]);
+      setCountyName(newCountyName.trim());
+      setShowAddCounty(false);
+      setNewCountyName('');
+    } catch (error) {
+      console.error('Error adding county:', error);
+      Alert.alert('Error', 'Failed to add county');
+    }
+  };
+
+  const handleImagePicker = () => {
+    setShowImagePicker(true);
+  };
+
+  const handleCameraCapture = () => {
+    setShowImagePicker(false);
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 1 as const,
+      includeBase64: false,
+    };
+    
+    launchCamera(options, (response: ImagePickerResponse) => {
+      if (response.assets && response.assets[0]) {
+        setImageUri(response.assets[0].uri || null);
+      }
+    });
+  };
+
+  const handleGallerySelect = () => {
+    setShowImagePicker(false);
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 1 as const,
+      includeBase64: false,
+    };
+    
+    launchImageLibrary(options, (response: ImagePickerResponse) => {
+      if (response.assets && response.assets[0]) {
+        setImageUri(response.assets[0].uri || null);
+      }
+    });
+  };
+
+  const removeImage = () => {
+    setImageUri(null);
   };
 
   useEffect(() => {
@@ -110,12 +202,13 @@ const UpdatePlate = ({ route }: Props) => {
       setStateFont(plate.state_font || '');
       setStateColors(plate.state_color ? plate.state_color.split(',').map(s => s.trim()).filter(Boolean) : []);
       setStateLocation((plate.state_location as any) || '');
-      setFeaturesTags(plate.tags || '');
       setDescription(plate.additional_description || '');
       setNotes(plate.notes || '');
       setText(plate.text || '');
       setCounty(!!plate.county);
+      setCountyName(plate.county_name || '');
       setUrl(!!plate.url);
+      setImageUri(plate.image_uri || null);
 
       if (plate.all_colors) {
         setSelectedColors(plate.all_colors.split(',').map(s => s.trim()).filter(Boolean));
@@ -123,8 +216,24 @@ const UpdatePlate = ({ route }: Props) => {
     }
   }, [plate]);
 
+  // Load tags for the plate
+  useEffect(() => {
+    const loadTags = async () => {
+      if (plateId) {
+        try {
+          const tags = await getTagsForPlate(plateId);
+          setSelectedTags(tags);
+        } catch (error) {
+          console.error('Error loading tags:', error);
+        }
+      }
+    };
+    loadTags();
+  }, [plateId]);
+
   const handleUpdate = async () => {
     try {
+      // Update the plate first
       await dispatch(
         updatePlateThunk({
           plate_id: plateId,
@@ -148,9 +257,15 @@ const UpdatePlate = ({ route }: Props) => {
           additional_description: description,
           notes,
           county,
+          county_name: countyName,
           url,
+          image_uri: imageUri || undefined,
         }),
       ).unwrap();
+
+      // Update tags separately
+      await setTagsForPlate(plateId, selectedTags);
+      
       navigation.goBack();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update plate');
@@ -197,6 +312,49 @@ const UpdatePlate = ({ route }: Props) => {
         <Text style={styles.label}>Has County</Text>
         <Switch value={county} onValueChange={setCounty} />
       </View>
+      
+      {/* County dropdown - only show if county is true and state is entered */}
+      {county && stateVal && (
+        <>
+          <Text style={styles.fieldLabel}>County</Text>
+          <TouchableOpacity style={styles.select} onPress={() => setCountyDropdownOpen(true)}>
+            <Text style={styles.selectText}>{countyName || 'Select County'}</Text>
+          </TouchableOpacity>
+          
+          {/* Add County Input */}
+          {showAddCounty && (
+            <View style={styles.addCountyContainer}>
+              <Text style={styles.fieldLabel}>Add New County</Text>
+              <TextInput
+                style={styles.input}
+                value={newCountyName}
+                onChangeText={setNewCountyName}
+                placeholder="Enter county name"
+                autoFocus
+              />
+              <View style={styles.addCountyButtons}>
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={() => {
+                    setShowAddCounty(false);
+                    setNewCountyName('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.addButton]}
+                  onPress={handleAddCounty}
+                  disabled={!newCountyName.trim()}
+                >
+                  <Text style={styles.buttonText}>Add County</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </>
+      )}
+      
       <View style={styles.rowBetween}>
         <Text style={styles.label}>Has URL</Text>
         <Switch value={url} onValueChange={setUrl} />
@@ -245,7 +403,11 @@ const UpdatePlate = ({ route }: Props) => {
       <Text style={styles.fieldLabel}>Plate Text</Text>
       <TextInput style={styles.input} value={text} onChangeText={setText} />
       <Text style={styles.fieldLabel}>Tags</Text>
-      <TextInput style={styles.input} value={featuresTags} onChangeText={setFeaturesTags} />
+      <TagSelector
+        selectedTags={selectedTags}
+        onTagsChange={setSelectedTags}
+        placeholder="Select Tags"
+      />
       <Text style={styles.fieldLabel}>Additional Description</Text>
       <TextInput style={styles.input} value={description} onChangeText={setDescription} />
 
@@ -257,6 +419,21 @@ const UpdatePlate = ({ route }: Props) => {
         onChangeText={setNotes}
         numberOfLines={6}
       />
+
+      {/* Image */}
+      <Text style={styles.fieldLabel}>Plate Image</Text>
+      {imageUri ? (
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+          <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
+            <Text style={styles.removeImageText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePicker}>
+          <Text style={styles.imagePickerText}>📷 Add Plate Image</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.button} onPress={handleUpdate}>
         <Text style={styles.buttonText}>Update Plate</Text>
@@ -449,6 +626,75 @@ const UpdatePlate = ({ route }: Props) => {
           </View>
         </View>
       </Modal>
+
+      {/* County modal */}
+      <Modal visible={countyDropdownOpen} transparent animationType="slide" onRequestClose={() => setCountyDropdownOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Select County</Text>
+            <Text style={styles.modalSubtitle}>
+              {stateVal ? `Counties in ${stateVal}` : 'Please enter a state first'}
+            </Text>
+            <ScrollView style={{maxHeight: 300}}>
+              {countyOptions.map(county => (
+                <TouchableOpacity 
+                  key={county.value} 
+                  style={styles.colorItem} 
+                  onPress={() => {
+                    if (county.value === 'ADD_NEW') {
+                      setShowAddCounty(true);
+                      setCountyDropdownOpen(false);
+                    } else {
+                      setCountyName(county.value);
+                      setCountyDropdownOpen(false);
+                    }
+                  }}
+                >
+                  <Text style={[
+                    {flex: 1},
+                    county.value === 'ADD_NEW' && styles.addCountyText
+                  ]}>
+                    {county.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[styles.button, {marginTop: 10}]} onPress={() => setCountyDropdownOpen(false)}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowImagePicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Select Image Source</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleCameraCapture}>
+                <Text style={styles.modalButtonIcon}>📷</Text>
+                <Text style={styles.modalButtonText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButton} onPress={handleGallerySelect}>
+                <Text style={styles.modalButtonIcon}>🖼️</Text>
+                <Text style={styles.modalButtonText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowImagePicker(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -502,4 +748,107 @@ const styles = StyleSheet.create({
   colorItemContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   colorDot: { width: 24, height: 24, borderRadius: 12, marginRight: 12, borderWidth: 1, borderColor: '#ddd' },
   colorCheckmark: { fontSize: 20, color: '#007bff', fontWeight: '700' },
+  addCountyText: {
+    color: '#007bff',
+    fontWeight: '600',
+  },
+  addCountyContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  addCountyButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+    flex: 1,
+    marginRight: 8,
+  },
+  addButton: {
+    backgroundColor: '#28a745',
+    flex: 1,
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  imageContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeImageText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  imagePickerButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  imagePickerText: {
+    color: '#333',
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  modalButton: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    minWidth: 100,
+  },
+  modalButtonIcon: {
+    fontSize: 30,
+    marginBottom: 8,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalCancelButton: {
+    backgroundColor: '#6c757d',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
 });
